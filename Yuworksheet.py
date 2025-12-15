@@ -1,11 +1,15 @@
+
 import dash
 from dash import dcc, html, Output, Input, State
 from dash.dependencies import ALL
 import requests
 
+
 app = dash.Dash(__name__)
 
-API_KEY = ""
+
+API_KEY = ""  # 請改回你的金鑰
+
 
 # 行程類別對應的 place types
 CATEGORY_TYPE_MAP = {
@@ -27,7 +31,9 @@ CATEGORY_TYPE_MAP = {
     ],
 }
 
+
 PAGE_SIZE = 10  # 每頁 10 筆
+
 
 # -----------------------
 # 版面設計 layout
@@ -190,6 +196,7 @@ app.layout = html.Div(
     },
 )
 
+
 # -----------------------
 # 工具函式
 # -----------------------
@@ -220,6 +227,14 @@ def search_places(lat, lng, apikey, types_list, radius=1000):
             pid = r.get("place_id")
             if pid and pid not in seen_ids:
                 seen_ids.add(pid)
+
+                # 取得第一張照片的 photo_reference（若有）
+                photos = r.get("photos")
+                if photos and isinstance(photos, list) and len(photos) > 0:
+                    r["photo_reference"] = photos[0].get("photo_reference")
+                else:
+                    r["photo_reference"] = None
+
                 all_results.append(r)
     return all_results
 
@@ -404,6 +419,17 @@ def render_page(all_options, page, all_details):
         dist = p.get("distance_km", 0.0)
         score = p.get("weighted_score", 0)
         price_level = p.get("price_level", "無")
+
+        # 建立 Place Photo URL（如果有照片）
+        photo_ref = p.get("photo_reference")
+        if photo_ref:
+            photo_url = (
+                "https://maps.googleapis.com/maps/api/place/photo"
+                f"?maxwidth=180&photo_reference={photo_ref}&key={API_KEY}"
+            )  # [web:3]
+        else:
+            photo_url = None
+
         cards.append(
             html.Div(
                 [
@@ -413,6 +439,28 @@ def render_page(all_options, page, all_details):
                         id={"type": "place-check", "index": pid},
                         style={"display": "inline-block", "marginRight": "8px"},
                     ),
+                    # 左側圖片區
+                    html.Div(
+                        children=(
+                            html.Img(
+                                src=photo_url,
+                                style={
+                                    "width": "100px",
+                                    "height": "100px",
+                                    "objectFit": "cover",
+                                    "borderRadius": "4px",
+                                    "marginRight": "10px",
+                                },
+                            )
+                            if photo_url
+                            else None
+                        ),
+                        style={
+                            "display": "inline-block",
+                            "verticalAlign": "top",
+                        },
+                    ),
+                    # 右側文字資訊
                     html.Div(
                         [
                             html.Div(
@@ -430,7 +478,11 @@ def render_page(all_options, page, all_details):
                                 style={"color": "#777", "fontSize": 14},
                             ),
                         ],
-                        style={"display": "inline-block", "verticalAlign": "top", "width": "90%"},
+                        style={
+                            "display": "inline-block",
+                            "verticalAlign": "top",
+                            "width": "75%",
+                        },
                     ),
                     html.Hr(style={"marginTop": "8px", "marginBottom": "8px"}),
                 ],
@@ -485,16 +537,30 @@ def change_page(prev_clicks, next_clicks, search_clicks, page, all_options):
 @app.callback(
     Output("place-selector", "value"),
     Input({"type": "place-check", "index": ALL}, "value"),
+    State("place-selector", "value"),
     State("place-selector", "options"),
 )
-def sync_checks(values, options):
-    selected_ids = []
+def sync_checks(values, current_selected, options):
+    # current_selected：跨頁累積的已選項目
+    if current_selected is None:
+        current_selected = []
+
+    valid_ids = {opt["value"] for opt in options}
+    selected_set = {pid for pid in current_selected if pid in valid_ids}
+
+    # values 是「當頁」所有 checkbox 的 value 列表
+    page_selected_ids = []
     for v_list in values:
         if v_list:
-            selected_ids.extend(v_list)
-    valid_ids = {opt["value"] for opt in options}
-    selected_ids = [pid for pid in selected_ids if pid in valid_ids]
-    return selected_ids
+            page_selected_ids.extend(v_list)
+
+    # 把當頁勾選的加入
+    for pid in page_selected_ids:
+        if pid in valid_ids:
+            selected_set.add(pid)
+
+    # 這個版本只累積選擇，不支援跨頁「取消」勾選
+    return list(selected_set)
 
 
 # -----------------------
