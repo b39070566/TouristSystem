@@ -15,7 +15,6 @@ app.config.suppress_callback_exceptions = True
 
 
 # 注意：請將此 API_KEY 替換為您自己的 Google Places API Key
-# 警告：此處的 API Key 僅為範例，不應在實際應用中公開
 API_KEY = ""
 
 CATEGORY_TYPE_MAP = {
@@ -48,7 +47,7 @@ def get_estimated_cost(price_level):
         pl_int = None
         
     if pl_int:
-        level_price_map = {1: 150, 2: 450, 3: 1000, 4: 1800}
+        level_price_map = {1: 200, 2: 400, 3: 1000, 4: 2000}
         return level_price_map.get(pl_int, 0)
     return 0
     
@@ -100,7 +99,7 @@ def price_level_by_budget(budget):
         return 4
     if budget <= 200:
         return 1
-    elif budget <= 600:
+    elif budget <= 400:
         return 2
     elif budget <= 1400:
         return 3
@@ -185,7 +184,6 @@ def calculate_weighted_score(
         place["weighted_score"] = round(weighted_score, 2)
         
         # 為了類型分類，添加地點類型
-        # 找到第一個匹配的類型
         primary_type = "其他"
         place_types = place.get("types", [])
         for k, v in CATEGORY_TYPE_MAP.items():
@@ -221,6 +219,16 @@ def fetch_place_details(place_id):
 # ---------- Layout (佈局) ----------
 app.layout = html.Div(
     [
+# 📌 修正：增加 style 屬性來強行放大圓圈
+        dcc.Loading(
+            id="loading-search",
+            type="circle",
+            fullscreen=True,
+            color="#0B16EA",
+            # 使用 CSS 變換 (transform) 將圓圈放大 2 倍 (scale(2))
+            style={"transform": "scale(2)"}, 
+            children=dcc.Store(id="loading-trigger-store")),
+
         html.Div(
             [
                 html.H1("附近行程智慧推薦", style={"marginBottom": "5px"}),
@@ -237,7 +245,7 @@ app.layout = html.Div(
                     id="address",
                     type="text",
                     placeholder="輸入出發地址，例如：台北車站",
-                    value=None, # 預設值，便於測試
+                    value=None, 
                     style={
                         "fontSize": 16,
                         "width": "320px",
@@ -249,7 +257,7 @@ app.layout = html.Div(
                     id="budget",
                     type="number",
                     placeholder="預算上限（例如 800）",
-                    value=None, # 預設值，便於測試
+                    value=None, 
                     style={
                         "fontSize": 16,
                         "width": "180px",
@@ -277,7 +285,7 @@ app.layout = html.Div(
                 html.Button(
                     "查詢",
                     id="search-btn",
-                    n_clicks=1, # 預設點擊 1 次，讓頁面啟動時就開始查詢
+                    n_clicks=0, # 修改初始值為 0
                     style={
                         "fontSize": 16,
                         "padding": "8px 20px",
@@ -383,20 +391,16 @@ app.layout = html.Div(
             style={"borderTop": "1px solid #eee", "paddingTop": "20px"},
         ),
         
-        # 隱藏的 CheckList 用於存儲所有選項和已選狀態
         dcc.Checklist(id="place-selector", options=[], value=[], style={"display": "none"}),
-        # dcc.Store 用於存儲數據
         dcc.Store(id="all-place-details", data={}), 
-        dcc.Store(id="all-options", data=[]),      
-        dcc.Store(id="page", data=0),            
+        dcc.Store(id="all-options", data=[]),       
+        dcc.Store(id="page", data=0),             
         dcc.Store(id="detail-cache", data={}),    
-        # 📌 Store：用於控制彈窗的開啟/關閉狀態
         dcc.Store(id="modal-trigger-state", data={"open": False, "pid": None}), 
         
-        # ----------------------------------------------------
-        # 📌 關鍵修正 2: 新增彈窗的靜態元件 (解決 Dash ID 找不到的問題)
-        # ----------------------------------------------------
-        # 彈窗背景 (Backdrop)，用於點擊關閉
+        # 📌 Store: 用於紀錄手動預算分配的 Store
+        dcc.Store(id="manual-budget-store", data={}),
+        
         html.Div(
             id='detail-backdrop', 
             n_clicks=0, 
@@ -406,7 +410,6 @@ app.layout = html.Div(
             }
         ), 
         
-        # 彈窗內容容器 (Modal)
         html.Div(
             id='detail-modal', 
             children=html.Div('載入中...'), 
@@ -428,30 +431,31 @@ app.layout = html.Div(
 )
 
 # ---------- 查詢主邏輯 (Search) ----------
+# 📌 修正點：移除 Output("place-selector", "value") 的主動重置，並合併 old_details 以保留已選地點資訊
 @app.callback(
     Output("all-options", "data"),
     Output("all-place-details", "data"),
     Output("place-selector", "options"),
-    Output("place-selector", "value"), 
     Output("page", "data"), 
+    Output("loading-trigger-store", "data"), 
     Input("search-btn", "n_clicks"),
     State("address", "value"),
     State("budget", "value"),
     State("category", "value"),
+    State("all-place-details", "data"), # 📌 讀取目前的 Store
     prevent_initial_call=False, 
 )
-def search_and_build_options(n, address, budget, category):
+def search_and_build_options(n, address, budget, category, old_details):
     if not n or n == 0:
         return no_update, no_update, no_update, no_update, no_update
     
     if not address or budget is None or budget <= 0:
-        return [], {}, [], [], 0 
+        return [], old_details if old_details else {}, [], 0, "done"
 
     try:
         lat, lng = get_latlng(address, API_KEY)
     except Exception as e:
-        # 如果 Geocoding 失敗，返回空結果
-        return [], {}, [], [], 0
+        return [], old_details if old_details else {}, [], 0, "done"
 
     if not category:
         category = ["food", "fun"]
@@ -463,7 +467,7 @@ def search_and_build_options(n, address, budget, category):
 
     nearby = search_places(lat, lng, API_KEY, types_list)
     if not nearby:
-        return [], {}, [], [], 0
+        return [], old_details if old_details else {}, [], 0, "done"
 
     nearby_scored = calculate_weighted_score(
         nearby, lat, lng, budget, distance_weight=0.5, price_weight=0.5
@@ -471,11 +475,13 @@ def search_and_build_options(n, address, budget, category):
     
     max_price_level = price_level_by_budget(budget)
     options = []
-    place_details_dict = {}
+    
+    # 📌 關鍵修改：合併新舊地點詳情字典，確保跨地址查詢後，已選地點的名稱不會消失
+    new_details = old_details.copy() if old_details else {}
     
     for p in nearby_scored:
         pid = p["place_id"]
-        place_details_dict[pid] = p
+        new_details[pid] = p
         
         pl = p.get("price_level")
         try:
@@ -485,12 +491,10 @@ def search_and_build_options(n, address, budget, category):
             
         name = p.get("name", "未知")
         
-        # 只保留符合預算限制的地點作為選項
         if pl_int is not None and pl_int <= max_price_level:
             options.append({"label": name, "value": pid})
             
-    # 新查詢時重設已選值為 []
-    return options, place_details_dict, options, [], 0
+    return options, new_details, options, 0, "done"
 
 
 # ---------- 當頁卡片渲染 (Render Page) ----------
@@ -526,7 +530,6 @@ def render_page(all_options, page, selected_values, all_details):
         photo_ref = p.get("photo_reference")
         photo_url = None
         if photo_ref:
-            # 建立 Google Place Photo API 圖片 URL
             photo_url = (
                 "https://maps.googleapis.com/maps/api/place/photo"
                 f"?maxwidth=180&photo_reference={photo_ref}&key={API_KEY}"
@@ -535,14 +538,12 @@ def render_page(all_options, page, selected_values, all_details):
         cards.append(
             html.Div(
                 [
-                    # 勾選框
                     dcc.Checklist(
                         options=[{"label": "", "value": pid}],
                         value=[pid] if pid in selected_values else [], 
                         id={"type": "place-check", "index": pid},
                         style={"display": "inline-block", "marginRight": "8px"},
                     ),
-                    # 圖片 (如果有)
                     html.Div(
                         children=(
                             html.Img(
@@ -563,7 +564,6 @@ def render_page(all_options, page, selected_values, all_details):
                             "verticalAlign": "top",
                         },
                     ),
-                    # 地點資訊
                     html.Div(
                         [
                             html.Div(
@@ -594,7 +594,6 @@ def render_page(all_options, page, selected_values, all_details):
                         style={
                             "display": "inline-block",
                             "verticalAlign": "top",
-                            # 根據是否有圖片調整寬度
                             "width": "calc(100% - 130px)" if photo_url else "calc(100% - 30px)",
                         },
                     ),
@@ -620,8 +619,6 @@ def render_page(all_options, page, selected_values, all_details):
     prevent_initial_call=True,
 )
 def change_page(prev_clicks, next_clicks, page, all_options):
-    from dash import callback_context
-
     ctx = callback_context
     if not ctx.triggered:
         raise dash.exceptions.PreventUpdate
@@ -642,113 +639,108 @@ def change_page(prev_clicks, next_clicks, page, all_options):
     return page
 
 
-# ---------- 同步 Checkbox & 移除按鈕 -> place-selector (修正重複輸出) ----------
+# ---------- 同步 Checkbox、移除與排序按鈕 -> place-selector ----------
 @app.callback(
     Output("place-selector", "value", allow_duplicate=True), 
     Input({"type": "place-check", "index": ALL}, "value"), 
     Input({"type": "remove-btn", "index": ALL}, "n_clicks"), 
+    Input({"type": "move-up", "index": ALL}, "n_clicks"),
+    Input({"type": "move-down", "index": ALL}, "n_clicks"),
     State("place-selector", "value"),
     prevent_initial_call=True,
 )
-def sync_checks_and_remove(check_values, remove_clicks, current_selected):
-    from dash import callback_context, no_update
-    import json
-
+def sync_checks_and_order(check_values, remove_clicks, up_clicks, down_clicks, current_selected):
     ctx = callback_context
     if not ctx.triggered:
         raise dash.exceptions.PreventUpdate
 
     trigger_prop = ctx.triggered[0]["prop_id"]
-    trigger_id = trigger_prop.split(".")[0]
-    trigger_value = ctx.triggered[0]["value"] # Checkbox 的值或 Button 的點擊數
+    trigger_id_raw = trigger_prop.split(".")[0]
+    trigger_value = ctx.triggered[0]["value"]
 
-    current_selected_set = set(current_selected or [])
+    current_list = list(current_selected or [])
     
-    # ------------------ 處理 Checkbox 點擊 (修復換頁消失問題) ------------------
-    if "place-check" in trigger_id:
-        
-        # 1. 識別被點擊的單一 Checkbox ID
-        try:
-            # 必須使用 json.loads 處理動態 ID 字符串
-            triggered_id_dict = json.loads(trigger_id.replace("'", '"'))
-            triggered_pid = triggered_id_dict.get("index")
-        except Exception:
-            # 如果解析失敗，表示這是一個非標準觸發 (例如換頁後的 "幽靈更新")，忽略。
-            raise dash.exceptions.PreventUpdate
-        
-        # 2. 獲取該 Checkbox 的新狀態
-        # 對於 dcc.Checklist，如果被選中，值是 [pid]，否則值是 []
-        is_checked = len(trigger_value) > 0
-        
-        if triggered_pid:
-            if is_checked:
-                current_selected_set.add(triggered_pid)
-            else:
-                current_selected_set.discard(triggered_pid) # discard 不會報錯
+    try:
+        trigger_dict = json.loads(trigger_id_raw)
+        pid = trigger_dict.get("index")
+        type_ = trigger_dict.get("type")
+    except:
+        raise dash.exceptions.PreventUpdate
 
-            return list(current_selected_set)
-        
-        return no_update
-
-
-    # ------------------ 處理移除按鈕點擊 ------------------
-    elif "remove-btn" in trigger_id:
-        # 確認是移除按鈕觸發，並且 n_clicks > 0
-        if trigger_value is None or trigger_value == 0:
-            raise dash.exceptions.PreventUpdate
-
-        removed_pid = None
-        try:
-            trigger_dict = json.loads(trigger_id.replace("'", '"'))
-            removed_pid = trigger_dict.get("index") if trigger_dict.get("type") == "remove-btn" else None
-        except Exception:
-            removed_pid = None
-
-        if removed_pid and removed_pid in current_selected_set:
-            current_selected_set.remove(removed_pid)
-            return list(current_selected_set)
+    if type_ == "place-check":
+        if trigger_value and pid not in current_list:
+            current_list.append(pid)
+        elif not trigger_value and pid in current_list:
+            current_list.remove(pid)
             
-        return no_update 
+    elif type_ == "remove-btn":
+        if pid in current_list:
+            current_list.remove(pid)
 
-    # 預設情況，防止意外的更新
-    raise dash.exceptions.PreventUpdate
+    elif type_ == "move-up":
+        idx = current_list.index(pid)
+        if idx > 0:
+            current_list[idx], current_list[idx-1] = current_list[idx-1], current_list[idx]
+
+    elif type_ == "move-down":
+        idx = current_list.index(pid)
+        if idx < len(current_list) - 1:
+            current_list[idx], current_list[idx+1] = current_list[idx+1], current_list[idx]
+
+    return current_list
+
+
+# 📌 修正：處理手動預算的 Callback
+@app.callback(
+    Output("manual-budget-store", "data"),
+    Input({"type": "budget-input", "index": ALL}, "value"),
+    State({"type": "budget-input", "index": ALL}, "id"),
+    State("manual-budget-store", "data"),
+    prevent_initial_call=True
+)
+def update_manual_budgets(values, ids, current_budgets):
+    current_budgets = current_budgets or {}
+    for val, id_dict in zip(values, ids):
+        pid = id_dict["index"]
+        current_budgets[pid] = val if val is not None else 0
+    return current_budgets
 
 
 # ---------- 預算檢查 (Budget Check) ----------
 @app.callback(
     Output("budget-warning", "children", allow_duplicate=True), 
     Input("place-selector", "value"),
+    Input("manual-budget-store", "data"),
     State("budget", "value"),
-    State("all-place-details", "data"),
     prevent_initial_call=True,
 )
-def check_budget(selected_places, budget, all_details):
+def check_budget(selected_places, manual_budgets, budget):
     if not selected_places or not budget:
         return ""
-        
+    
+    manual_budgets = manual_budgets or {}
     total_cost = 0
     for place_id in selected_places:
-        detail = all_details.get(place_id, {})
-        # 這裡改用新的 get_estimated_cost 函式
-        cost = get_estimated_cost(detail.get("price_level"))
-        total_cost += cost
+        total_cost += manual_budgets.get(place_id, 0)
         
     if total_cost > budget:
-        return html.Span(f"⚠️ 目前選擇的行程估計花費約 {total_cost:.0f}，已超出預算 {budget}，請調整選擇或提高預算。", style={"color": "red"})
+        return html.Span(f"⚠️ 目前分配預算約 {total_cost:.0f}，已超出預算 {budget}。", style={"color": "red"})
         
-    return html.Span(f"目前選擇的行程估計花費約 {total_cost:.0f}，在預算 {budget} 以內。", style={"color": "green"})
+    return html.Span(f"目前分配預算約 {total_cost:.0f}，在預算 {budget} 以內。", style={"color": "green"})
 
 
 # ---------- 右側已選行程渲染 (Selected Itinerary) ----------
 @app.callback(
     Output("selected-itinerary", "children"),
     Input("place-selector", "value"),
+    State("manual-budget-store", "data"),
     State("all-place-details", "data"),
 )
-def show_selected_itinerary(selected_places, all_details):
+def show_selected_itinerary(selected_places, manual_budgets, all_details):
     if not selected_places:
         return html.Div("尚未選擇任何地點。", style={"color": "#777"})
     
+    manual_budgets = manual_budgets or {}
     items = []
     for i, pid in enumerate(selected_places):
         p = all_details.get(pid, {})
@@ -757,17 +749,34 @@ def show_selected_itinerary(selected_places, all_details):
         rating = p.get("rating", "無")
         dist = p.get("distance_km", 0.0)
         
+        stored_cost = manual_budgets.get(pid)
+        initial_val = stored_cost if stored_cost is not None else get_estimated_cost(p.get("price_level"))
+
         items.append(
             html.Li(
                 [
                     html.Div(
                         [
-                            html.Span(f"{i+1}. ", style={"fontWeight": "bold", "marginRight": "5px"}), # 新增編號
+                            html.Span(f"{i+1}. ", style={"fontWeight": "bold", "marginRight": "5px"}),
                             html.Span(name, style={"fontWeight": "bold"}),
-                            html.Span(f" ｜ 評分 {rating} ｜ 距離 {dist:.2f} 公里"),
+                            html.Span([
+                                html.Button("↑", id={"type": "move-up", "index": pid}, style={"marginLeft": "5px", "padding": "0 5px"}),
+                                html.Button("↓", id={"type": "move-down", "index": pid}, style={"marginLeft": "2px", "padding": "0 5px"}),
+                            ], style={"float": "right"})
                         ],
                         style={"marginBottom": "2px"}
                     ),
+                    html.Div([
+                        html.Span("分配預算: ", style={"fontSize": "13px"}),
+                        dcc.Input(
+                            id={"type": "budget-input", "index": pid},
+                            type="number",
+                            value=initial_val,
+                            debounce=True,
+                            style={"width": "80px", "marginLeft": "5px"}
+                        ),
+                        html.Span(" 元", style={"fontSize": "13px"})
+                    ], style={"marginBottom": "5px"}),
                     html.Div(f"地址：{addr}", style={"fontSize": 13, "color": "#555"}),
                     html.Button(
                         "移除",
@@ -777,28 +786,28 @@ def show_selected_itinerary(selected_places, all_details):
                             "marginTop": "2px",
                             "fontSize": 12,
                             "padding": "2px 6px",
+                            "color": "red"
                         },
                     ),
                 ],
-                style={"marginBottom": "6px", "paddingBottom": "4px", "borderBottom": "1px dotted #eee"},
+                style={"marginBottom": "10px", "paddingBottom": "4px", "borderBottom": "1px solid #eee"}
             )
         )
     return html.Ol(items, style={"paddingLeft": "0px", "listStyleType": "none"}) 
 
 
 # ----------------------------------------------------
-# 📈 NEW CALLBACK: 圓餅圖數據計算和渲染
+# 📈 圓餅圖數據計算和渲染
 # ----------------------------------------------------
 @app.callback(
     Output("budget-pie-chart", "figure"),
     Output("category-pie-chart", "figure"),
     Input("place-selector", "value"),
+    Input("manual-budget-store", "data"),
     State("budget", "value"),
     State("all-place-details", "data"),
 )
-def render_pie_charts(selected_places, total_budget, all_details):
-    
-    # 預設圖表 (無數據時顯示)
+def render_pie_charts(selected_places, manual_budgets, total_budget, all_details):
     empty_figure = {
         'data': [{'type': 'pie', 'labels': ['無資料'], 'values': [1], 'marker': {'colors': ['#f0f0f0']}}],
         'layout': {'title': {'text': '無選定行程', 'font': {'size': 16}}, 'margin': {'t': 40, 'b': 20, 'l': 0, 'r': 0}, 'showlegend': False}
@@ -807,37 +816,27 @@ def render_pie_charts(selected_places, total_budget, all_details):
     if not selected_places:
         return empty_figure, empty_figure
 
-    # 1. 預算佔比計算 (Budget Breakdown)
+    manual_budgets = manual_budgets or {}
     budget_labels = []
     budget_values = []
     total_spent = 0
-    
-    # 類型佔比計算 (Category Breakdown)
     category_counts = {}
     
     for pid in selected_places:
         p = all_details.get(pid, {})
         name = p.get("name", "未知")
-        
-        # a. 預算
-        cost = get_estimated_cost(p.get("price_level"))
-        if cost > 0:
-            budget_labels.append(name)
-            budget_values.append(cost)
-            total_spent += cost
+        cost = manual_budgets.get(pid, 0)
+        budget_labels.append(name)
+        budget_values.append(cost)
+        total_spent += cost
             
-        # b. 類型
-        # primary_type 是在 search_and_build_options 的 calculate_weighted_score 中添加的
         primary_type = p.get("primary_type", "其他")
         category_counts[primary_type] = category_counts.get(primary_type, 0) + 1
 
-    # 處理總預算剩餘
     remaining_budget = max(total_budget - total_spent, 0) if total_budget else 0
-    
     budget_data = []
-    budget_title = "行程預算佔比"
     
-    if budget_values:
+    if any(v > 0 for v in budget_values):
         if total_budget and remaining_budget > 0:
             budget_labels.append(f"剩餘預算 ({remaining_budget:.0f})")
             budget_values.append(remaining_budget)
@@ -847,19 +846,16 @@ def render_pie_charts(selected_places, total_budget, all_details):
                 'type': 'pie',
                 'labels': budget_labels,
                 'values': budget_values,
-                'name': '',
                 'hole': .3,
                 'hoverinfo': 'label+percent+value',
                 'textinfo': 'label',
-                'marker': {'colors': ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']},
+                'marker': {'colors': ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']},
             }
         ]
-        budget_title = f"行程預算佔比 (總預算: {total_budget or 'N/A'})"
-        
+        budget_title = f"行程預算佔比 (總分配: {total_spent})"
     else:
-        # 如果所有已選地點都沒有價格資訊，則使用空圖
         budget_data = empty_figure['data']
-        budget_title = empty_figure['layout']['title']['text'] + " (預算)"
+        budget_title = "預算分配中..."
         
     budget_figure = {
         'data': budget_data,
@@ -870,7 +866,6 @@ def render_pie_charts(selected_places, total_budget, all_details):
         }
     }
 
-    # ------------------- 渲染類型圓餅圖 -------------------
     category_labels = list(category_counts.keys())
     category_values = list(category_counts.values())
 
@@ -880,7 +875,6 @@ def render_pie_charts(selected_places, total_budget, all_details):
                 'type': 'pie',
                 'labels': category_labels,
                 'values': category_values,
-                'name': '',
                 'hole': .3,
                 'hoverinfo': 'label+value',
                 'textinfo': 'label+percent',
@@ -896,7 +890,7 @@ def render_pie_charts(selected_places, total_budget, all_details):
     
     return budget_figure, category_figure
     
-# 📌 CALLBACK 1: 專門控制彈窗開啟/關閉狀態
+# 📌 CALLBACK 1: 控制彈窗開啟/關閉狀態
 @app.callback(
     Output("modal-trigger-state", "data"),
     Input({"type": "detail-btn", "index": ALL}, "n_clicks"),
@@ -915,18 +909,14 @@ def update_modal_trigger_state(detail_clicks, backdrop_clicks, close_clicks, cur
     trigger_prop = ctx.triggered[0]["prop_id"]
     trigger_id = trigger_prop.split(".")[0]
     
-    # 處理關閉事件 (點擊背景或關閉按鈕)
     if trigger_id == "detail-backdrop" or "close-detail" in trigger_id:
-        # 只有在彈窗目前為開啟狀態時才執行關閉
         if current_state.get("open"):
             return {"open": False, "pid": None}
         return no_update
 
     place_id = None
     if "detail-btn" in trigger_id:
-        # 處理打開事件 (點擊查看詳情按鈕)
         try:
-            # 確保是有效的點擊 (n_clicks > 0)
             if ctx.triggered[0]["value"] > 0:
                 trigger_dict = json.loads(trigger_id.replace("'", '"'))
                 place_id = trigger_dict.get("index")
@@ -934,13 +924,12 @@ def update_modal_trigger_state(detail_clicks, backdrop_clicks, close_clicks, cur
             return no_update
 
     if place_id:
-        # 打開事件：將 open 設為 True，並傳入 Place ID
         if not current_state.get("open") or current_state.get("pid") != place_id:
             return {"open": True, "pid": place_id}
         
     return no_update
 
-# 📌 CALLBACK 2: 專門渲染彈窗內容
+# 📌 CALLBACK 2: 渲染彈窗內容
 @app.callback(
     Output("detail-modal", "children"),
     Output("detail-modal", "style"),
@@ -956,9 +945,7 @@ def render_detail_modal(trigger_state, cache):
     is_open = trigger_state.get("open", False)
     place_id = trigger_state.get("pid")
     
-    # ------------------- 處理關閉狀態 -------------------
     if not is_open or not place_id:
-        # 樣式設為隱藏
         modal_style = {
             "position": "fixed", "top": "50%", "left": "50%", "transform": "translate(-50%, -50%)",
             "backgroundColor": "white", "border": "1px solid #ccc", "borderRadius": "6px",
@@ -970,30 +957,22 @@ def render_detail_modal(trigger_state, cache):
             "position": "fixed", "top": 0, "left": 0, "width": "100vw", "height": "100vh",
             "backgroundColor": "rgba(0,0,0,0.3)", "zIndex": 999, "display": "none", 
         }
-        # 關閉時返回空的 div 作為內容
         return html.Div(), modal_style, backdrop_style, no_update
 
-    # ------------------- 處理打開狀態 -------------------
-    
     cache = cache or {}
-    
-    # 1. 嘗試從快取中讀取
     if place_id in cache:
         detail = cache[place_id]
         result = detail["result"]
         reviews = detail["reviews"]
         new_cache = no_update
-    # 2. 快取中沒有則請求 API
     else:
         try:
             result, reviews = fetch_place_details(place_id) 
             cache[place_id] = {"result": result, "reviews": reviews} 
             new_cache = cache
         except Exception:
-             # 錯誤處理
-            return html.Div("詳情加載失敗，請檢查 API Key 或網路連線。"), no_update, no_update, no_update
+            return html.Div("詳情加載失敗"), no_update, no_update, no_update
 
-    # --- 渲染內容 ---
     name = result.get("name", "未知")
     addr = result.get("formatted_address", "無地址")
     rating = result.get("rating", "無")
@@ -1015,63 +994,36 @@ def render_detail_modal(trigger_state, cache):
         text = rv.get("text", "")
         score = rv.get("rating", "")
         relative_time = rv.get("relative_time_description", "")
-        
         review_blocks.append(
-            html.Div(
-                [
-                    html.Div(
-                        [
-                            html.Span(author, style={"fontWeight": "bold"}),
-                            html.Span(f" ｜ 評分 {score} ({relative_time})", style={"fontSize": 13, "color": "#ffa000"}),
-                        ]
-                    ),
-                    html.Div(text, style={"fontSize": 13, "color": "#444", "marginBottom": "6px"}),
-                ],
-                style={"marginBottom": "8px", "paddingLeft": "10px", "borderLeft": "2px solid #ddd"},
-            )
+            html.Div([
+                html.Div([
+                    html.Span(author, style={"fontWeight": "bold"}),
+                    html.Span(f" ｜ 評分 {score} ({relative_time})", style={"fontSize": 13, "color": "#ffa000"}),
+                ]),
+                html.Div(text, style={"fontSize": 13, "color": "#444", "marginBottom": "6px"}),
+            ], style={"marginBottom": "8px", "paddingLeft": "10px", "borderLeft": "2px solid #ddd"})
         )
         
-    content = html.Div(
-        [
-            html.Div(
-                [
-                    html.Span(name, style={"fontSize": 18, "fontWeight": "bold"}),
-                    html.Button(
-                        "關閉",
-                        id={"type": "close-detail", "index": place_id},
-                        n_clicks=0,
-                        style={
-                            "float": "right", "fontSize": 12, "padding": "2px 8px", 
-                            "border": "1px solid #ccc", "borderRadius": "4px", "cursor": "pointer"
-                        },
-                    ),
-                ],
-                style={"marginBottom": "8px", "borderBottom": "1px solid #eee", "paddingBottom": "8px"},
-            ),
-            html.Div(f"地址：{addr}", style={"fontSize": 14, "marginBottom": "4px"}),
-            html.Div(
-                [
-                    html.Span(f"平均評分：{rating} ({user_ratings_total} 則評論)"),
-                    html.Span(" ｜ 營業狀態："),
-                    open_text,
-                ], 
-                style={"fontSize": 14, "marginBottom": "4px"}
-            ),
-            html.Div(f"電話：{phone}" if phone else "電話：無", style={"fontSize": 14}),
-            html.Div(
-                [
-                    "網站：",
-                    html.A(website, href=website, target="_blank", style={"color": "#1976D2"}) if website else "無",
-                ],
-                style={"fontSize": 14, "marginBottom": "12px"},
-            ),
-            html.Hr(),
-            html.Div("最新評論（最多 3 則）：", style={"fontWeight": "bold", "marginBottom": "6px"}),
-            *(review_blocks if review_blocks else [html.Div("無評論資訊", style={"color": "#777"})]),
-        ]
-    )
+    content = html.Div([
+        html.Div([
+            html.Span(name, style={"fontSize": 18, "fontWeight": "bold"}),
+            html.Button("關閉", id={"type": "close-detail", "index": place_id}, n_clicks=0, style={"float": "right", "fontSize": 12, "padding": "2px 8px", "border": "1px solid #ccc", "borderRadius": "4px", "cursor": "pointer"}),
+        ], style={"marginBottom": "8px", "borderBottom": "1px solid #eee", "paddingBottom": "8px"}),
+        html.Div(f"地址：{addr}", style={"fontSize": 14, "marginBottom": "4px"}),
+        html.Div([
+            html.Span(f"平均評分：{rating} ({user_ratings_total} 則評論)"),
+            html.Span(" ｜ 營業狀態："), open_text,
+        ], style={"fontSize": 14, "marginBottom": "4px"}),
+        html.Div(f"電話：{phone}" if phone else "電話：無", style={"fontSize": 14}),
+        html.Div([
+            "網站：",
+            html.A(website, href=website, target="_blank", style={"color": "#1976D2"}) if website else "無",
+        ], style={"fontSize": 14, "marginBottom": "12px"}),
+        html.Hr(),
+        html.Div("最新評論（最多 3 則）：", style={"fontWeight": "bold", "marginBottom": "6px"}),
+        *(review_blocks if review_blocks else [html.Div("無評論資訊", style={"color": "#777"})]),
+    ])
     
-    # 更新樣式為顯示
     modal_style = {
         "position": "fixed", "top": "50%", "left": "50%", "transform": "translate(-50%, -50%)",
         "backgroundColor": "white", "border": "1px solid #ccc", "borderRadius": "6px",
@@ -1088,5 +1040,4 @@ def render_detail_modal(trigger_state, cache):
 
 
 if __name__ == "__main__":
-    # 記得替換 API_KEY 為有效的值，否則 Place API 相關功能將無法正常運行
     app.run(debug=True)
