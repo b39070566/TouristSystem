@@ -383,7 +383,7 @@ if not API_KEY:
 
 # Fallback（僅在你沒有提供環境變數或 .env 時使用；建議移除或替換為空字串）
 if not API_KEY:
-    API_KEY = "你的API KEY"
+    API_KEY = ""
 
 PAGE_SIZE = 10
 
