@@ -4,15 +4,23 @@ from dash.dependencies import ALL
 import requests
 import json
 import dash.exceptions
+<<<<<<< HEAD
 from dash import callback_context 
+=======
+from dash import callback_context
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
 
 app = dash.Dash(__name__)
 
 # ----------------------------------------------------
 # 📌 關鍵修正 1: 抑制 ID not found in layout 錯誤 (用於動態 ID)
 # ----------------------------------------------------
+<<<<<<< HEAD
 app.config.suppress_callback_exceptions = True 
 
+=======
+app.config.suppress_callback_exceptions = True
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
 
 # 注意：請將此 API_KEY 替換為您自己的 Google Places API Key
 API_KEY = ""
@@ -38,6 +46,10 @@ CATEGORY_TYPE_MAP = {
 
 PAGE_SIZE = 10
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
 # 價位等級到估計花費的映射 (TWD/RMB 估算)
 def get_estimated_cost(price_level):
     """根據價位等級估計平均花費 (RMB/TWD 估算)"""
@@ -45,12 +57,21 @@ def get_estimated_cost(price_level):
         pl_int = int(price_level) if price_level is not None else None
     except Exception:
         pl_int = None
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     if pl_int:
         level_price_map = {1: 200, 2: 400, 3: 1000, 4: 2000}
         return level_price_map.get(pl_int, 0)
     return 0
+<<<<<<< HEAD
     
+=======
+
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
 # ---------- 工具函式 (Tool Functions) ----------
 def get_latlng(address, apikey):
     """將地址轉換為經緯度 (Geocoding)"""
@@ -60,7 +81,11 @@ def get_latlng(address, apikey):
     ).json()
     if not resp["results"]:
         raise ValueError("無法找到該地址的經緯度")
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     loc = resp["results"][0]["geometry"]["location"]
     return loc["lat"], loc["lng"]
 
@@ -128,22 +153,38 @@ def normalize_score(value, min_val, max_val):
 
 
 def calculate_weighted_score(
+<<<<<<< HEAD
     places_list, user_lat, user_lng, budget, distance_weight=0.5, price_weight=0.5
+=======
+        places_list, user_lat, user_lng, budget, distance_weight=0.5, price_weight=0.5
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
 ):
     """計算地點的加權分數"""
     if not places_list:
         return []
+<<<<<<< HEAD
         
     for place in places_list:
         lat = place.get("geometry", {}).get("location", {}).get("lat")
         lng = place.get("geometry", {}).get("location", {}).get("lng")
         
+=======
+
+    for place in places_list:
+        lat = place.get("geometry", {}).get("location", {}).get("lat")
+        lng = place.get("geometry", {}).get("location", {}).get("lng")
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
         if lat is not None and lng is not None:
             distance = calculate_distance(user_lat, user_lng, lat, lng)
             place["distance_km"] = distance
         else:
             place["distance_km"] = float("inf")
+<<<<<<< HEAD
             
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
         price_level = place.get("price_level")
         try:
             price_level = int(price_level) if price_level is not None else None
@@ -155,11 +196,19 @@ def calculate_weighted_score(
     valid_prices = [p["price_level_int"] for p in places_list if p["price_level_int"] is not None]
 
     if not valid_distances:
+<<<<<<< HEAD
         min_distance, max_distance = 0, 1  
     else:
         min_distance = min(valid_distances)
         max_distance = max(valid_distances)
         
+=======
+        min_distance, max_distance = 0, 1
+    else:
+        min_distance = min(valid_distances)
+        max_distance = max(valid_distances)
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     if not valid_prices:
         min_price, max_price = 1, 4
     else:
@@ -179,10 +228,17 @@ def calculate_weighted_score(
             price_score = 0.5
         else:
             price_score = normalize_score(price, min_price, max_price)
+<<<<<<< HEAD
             
         weighted_score = (distance_score * distance_weight + price_score * price_weight) * 100
         place["weighted_score"] = round(weighted_score, 2)
         
+=======
+
+        weighted_score = (distance_score * distance_weight + price_score * price_weight) * 100
+        place["weighted_score"] = round(weighted_score, 2)
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
         # 為了類型分類，添加地點類型
         primary_type = "其他"
         place_types = place.get("types", [])
@@ -195,7 +251,10 @@ def calculate_weighted_score(
                 break
         place["primary_type"] = primary_type
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     sorted_places = sorted(places_list, key=lambda x: x["weighted_score"], reverse=True)
     return sorted_places
 
@@ -212,21 +271,33 @@ def fetch_place_details(place_id):
         },
     ).json()
     result = resp.get("result", {})
+<<<<<<< HEAD
     reviews = result.get("reviews", [])[:3] 
+=======
+    reviews = result.get("reviews", [])[:3]
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     return result, reviews
 
 
 # ---------- Layout (佈局) ----------
 app.layout = html.Div(
     [
+<<<<<<< HEAD
 # 📌 修正：增加 style 屬性來強行放大圓圈
+=======
+        # 📌 修正：增加 style 屬性來強行放大圓圈
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
         dcc.Loading(
             id="loading-search",
             type="circle",
             fullscreen=True,
             color="#0B16EA",
             # 使用 CSS 變換 (transform) 將圓圈放大 2 倍 (scale(2))
+<<<<<<< HEAD
             style={"transform": "scale(2)"}, 
+=======
+            style={"transform": "scale(2)"},
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
             children=dcc.Store(id="loading-trigger-store")),
 
         html.Div(
@@ -245,7 +316,11 @@ app.layout = html.Div(
                     id="address",
                     type="text",
                     placeholder="輸入出發地址，例如：台北車站",
+<<<<<<< HEAD
                     value=None, 
+=======
+                    value=None,
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
                     style={
                         "fontSize": 16,
                         "width": "320px",
@@ -257,7 +332,11 @@ app.layout = html.Div(
                     id="budget",
                     type="number",
                     placeholder="預算上限（例如 800）",
+<<<<<<< HEAD
                     value=None, 
+=======
+                    value=None,
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
                     style={
                         "fontSize": 16,
                         "width": "180px",
@@ -285,7 +364,11 @@ app.layout = html.Div(
                 html.Button(
                     "查詢",
                     id="search-btn",
+<<<<<<< HEAD
                     n_clicks=0, # 修改初始值為 0
+=======
+                    n_clicks=0,  # 修改初始值為 0
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
                     style={
                         "fontSize": 16,
                         "padding": "8px 20px",
@@ -367,7 +450,11 @@ app.layout = html.Div(
             ],
             style={"display": "flex", "flexDirection": "row", "marginBottom": "20px"},
         ),
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
         # 📈 圓餅圖容器
         html.Div(
             [
@@ -390,6 +477,7 @@ app.layout = html.Div(
             ],
             style={"borderTop": "1px solid #eee", "paddingTop": "20px"},
         ),
+<<<<<<< HEAD
         
         dcc.Checklist(id="place-selector", options=[], value=[], style={"display": "none"}),
         dcc.Store(id="all-place-details", data={}), 
@@ -404,15 +492,39 @@ app.layout = html.Div(
         html.Div(
             id='detail-backdrop', 
             n_clicks=0, 
+=======
+
+        dcc.Checklist(id="place-selector", options=[], value=[], style={"display": "none"}),
+        dcc.Store(id="all-place-details", data={}),
+        dcc.Store(id="all-options", data=[]),
+        dcc.Store(id="page", data=0),
+        dcc.Store(id="detail-cache", data={}),
+        dcc.Store(id="modal-trigger-state", data={"open": False, "pid": None}),
+
+        # 📌 Store: 用於紀錄手動預算分配的 Store
+        dcc.Store(id="manual-budget-store", data={}),
+
+        html.Div(
+            id='detail-backdrop',
+            n_clicks=0,
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
             style={
                 "position": "fixed", "top": 0, "left": 0, "width": "100vw", "height": "100vh",
                 "backgroundColor": "rgba(0,0,0,0.3)", "zIndex": 999, "display": "none"
             }
+<<<<<<< HEAD
         ), 
         
         html.Div(
             id='detail-modal', 
             children=html.Div('載入中...'), 
+=======
+        ),
+
+        html.Div(
+            id='detail-modal',
+            children=html.Div('載入中...'),
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
             style={
                 "position": "fixed", "top": "50%", "left": "50%", "transform": "translate(-50%, -50%)",
                 "backgroundColor": "white", "border": "1px solid #ccc", "borderRadius": "6px",
@@ -430,25 +542,43 @@ app.layout = html.Div(
     },
 )
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
 # ---------- 查詢主邏輯 (Search) ----------
 # 📌 修正點：移除 Output("place-selector", "value") 的主動重置，並合併 old_details 以保留已選地點資訊
 @app.callback(
     Output("all-options", "data"),
     Output("all-place-details", "data"),
     Output("place-selector", "options"),
+<<<<<<< HEAD
     Output("page", "data"), 
     Output("loading-trigger-store", "data"), 
+=======
+    Output("page", "data"),
+    Output("loading-trigger-store", "data"),
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     Input("search-btn", "n_clicks"),
     State("address", "value"),
     State("budget", "value"),
     State("category", "value"),
+<<<<<<< HEAD
     State("all-place-details", "data"), # 📌 讀取目前的 Store
     prevent_initial_call=False, 
+=======
+    State("all-place-details", "data"),  # 📌 讀取目前的 Store
+    prevent_initial_call=False,
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
 )
 def search_and_build_options(n, address, budget, category, old_details):
     if not n or n == 0:
         return no_update, no_update, no_update, no_update, no_update
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     if not address or budget is None or budget <= 0:
         return [], old_details if old_details else {}, [], 0, "done"
 
@@ -472,6 +602,7 @@ def search_and_build_options(n, address, budget, category, old_details):
     nearby_scored = calculate_weighted_score(
         nearby, lat, lng, budget, distance_weight=0.5, price_weight=0.5
     )
+<<<<<<< HEAD
     
     max_price_level = price_level_by_budget(budget)
     options = []
@@ -483,17 +614,39 @@ def search_and_build_options(n, address, budget, category, old_details):
         pid = p["place_id"]
         new_details[pid] = p
         
+=======
+
+    max_price_level = price_level_by_budget(budget)
+    options = []
+
+    # 📌 關鍵修改：合併新舊地點詳情字典，確保跨地址查詢後，已選地點的名稱不會消失
+    new_details = old_details.copy() if old_details else {}
+
+    for p in nearby_scored:
+        pid = p["place_id"]
+        new_details[pid] = p
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
         pl = p.get("price_level")
         try:
             pl_int = int(pl) if pl is not None else None
         except Exception:
             pl_int = None
+<<<<<<< HEAD
             
         name = p.get("name", "未知")
         
         if pl_int is not None and pl_int <= max_price_level:
             options.append({"label": name, "value": pid})
             
+=======
+
+        name = p.get("name", "未知")
+
+        if pl_int is not None and pl_int <= max_price_level:
+            options.append({"label": name, "value": pid})
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     return options, new_details, options, 0, "done"
 
 
@@ -503,13 +656,21 @@ def search_and_build_options(n, address, budget, category, old_details):
     Output("page-info", "children"),
     Input("all-options", "data"),
     Input("page", "data"),
+<<<<<<< HEAD
     Input("place-selector", "value"), 
+=======
+    Input("place-selector", "value"),
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     State("all-place-details", "data"),
 )
 def render_page(all_options, page, selected_values, all_details):
     if not all_options:
         return html.Div("請先輸入地址與預算後按下「查詢」。", style={"color": "#777", "fontSize": 16}), ""
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     page = page or 0
     start = page * PAGE_SIZE
     end = start + PAGE_SIZE
@@ -540,7 +701,11 @@ def render_page(all_options, page, selected_values, all_details):
                 [
                     dcc.Checklist(
                         options=[{"label": "", "value": pid}],
+<<<<<<< HEAD
                         value=[pid] if pid in selected_values else [], 
+=======
+                        value=[pid] if pid in selected_values else [],
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
                         id={"type": "place-check", "index": pid},
                         style={"display": "inline-block", "marginRight": "8px"},
                     ),
@@ -604,14 +769,22 @@ def render_page(all_options, page, selected_values, all_details):
         )
 
     max_page = (len(all_options) - 1) // PAGE_SIZE + 1
+<<<<<<< HEAD
     max_page = max(max_page, 1) 
+=======
+    max_page = max(max_page, 1)
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     page_text = f"第 {page + 1} / {max_page} 頁"
     return cards, page_text
 
 
 # ---------- 換頁邏輯 (Change Page) ----------
 @app.callback(
+<<<<<<< HEAD
     Output("page", "data", allow_duplicate=True), 
+=======
+    Output("page", "data", allow_duplicate=True),
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     Input("prev-page", "n_clicks"),
     Input("next-page", "n_clicks"),
     State("page", "data"),
@@ -627,10 +800,17 @@ def change_page(prev_clicks, next_clicks, page, all_options):
         raise dash.exceptions.PreventUpdate
 
     trigger = ctx.triggered[0]["prop_id"].split(".")[0]
+<<<<<<< HEAD
     page = page or 0 
 
     max_page = (len(all_options) - 1) // PAGE_SIZE 
     
+=======
+    page = page or 0
+
+    max_page = (len(all_options) - 1) // PAGE_SIZE
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     if trigger == "prev-page":
         page = max(page - 1, 0)
     elif trigger == "next-page":
@@ -641,9 +821,15 @@ def change_page(prev_clicks, next_clicks, page, all_options):
 
 # ---------- 同步 Checkbox、移除與排序按鈕 -> place-selector ----------
 @app.callback(
+<<<<<<< HEAD
     Output("place-selector", "value", allow_duplicate=True), 
     Input({"type": "place-check", "index": ALL}, "value"), 
     Input({"type": "remove-btn", "index": ALL}, "n_clicks"), 
+=======
+    Output("place-selector", "value", allow_duplicate=True),
+    Input({"type": "place-check", "index": ALL}, "value"),
+    Input({"type": "remove-btn", "index": ALL}, "n_clicks"),
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     Input({"type": "move-up", "index": ALL}, "n_clicks"),
     Input({"type": "move-down", "index": ALL}, "n_clicks"),
     State("place-selector", "value"),
@@ -659,7 +845,11 @@ def sync_checks_and_order(check_values, remove_clicks, up_clicks, down_clicks, c
     trigger_value = ctx.triggered[0]["value"]
 
     current_list = list(current_selected or [])
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     try:
         trigger_dict = json.loads(trigger_id_raw)
         pid = trigger_dict.get("index")
@@ -672,7 +862,11 @@ def sync_checks_and_order(check_values, remove_clicks, up_clicks, down_clicks, c
             current_list.append(pid)
         elif not trigger_value and pid in current_list:
             current_list.remove(pid)
+<<<<<<< HEAD
             
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     elif type_ == "remove-btn":
         if pid in current_list:
             current_list.remove(pid)
@@ -680,12 +874,20 @@ def sync_checks_and_order(check_values, remove_clicks, up_clicks, down_clicks, c
     elif type_ == "move-up":
         idx = current_list.index(pid)
         if idx > 0:
+<<<<<<< HEAD
             current_list[idx], current_list[idx-1] = current_list[idx-1], current_list[idx]
+=======
+            current_list[idx], current_list[idx - 1] = current_list[idx - 1], current_list[idx]
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
 
     elif type_ == "move-down":
         idx = current_list.index(pid)
         if idx < len(current_list) - 1:
+<<<<<<< HEAD
             current_list[idx], current_list[idx+1] = current_list[idx+1], current_list[idx]
+=======
+            current_list[idx], current_list[idx + 1] = current_list[idx + 1], current_list[idx]
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
 
     return current_list
 
@@ -697,6 +899,7 @@ def sync_checks_and_order(check_values, remove_clicks, up_clicks, down_clicks, c
     State({"type": "budget-input", "index": ALL}, "id"),
     State("manual-budget-store", "data"),
     prevent_initial_call=True
+<<<<<<< HEAD
 )
 def update_manual_budgets(values, ids, current_budgets):
     current_budgets = current_budgets or {}
@@ -718,14 +921,44 @@ def check_budget(selected_places, manual_budgets, budget):
     if not selected_places or not budget:
         return ""
     
+=======
+)
+def update_manual_budgets(values, ids, current_budgets):
+    current_budgets = current_budgets or {}
+    for val, id_dict in zip(values, ids):
+        pid = id_dict["index"]
+        current_budgets[pid] = val if val is not None else 0
+    return current_budgets
+
+
+# ---------- 預算檢查 (Budget Check) ----------
+@app.callback(
+    Output("budget-warning", "children", allow_duplicate=True),
+    Input("place-selector", "value"),
+    Input("manual-budget-store", "data"),
+    State("budget", "value"),
+    prevent_initial_call=True,
+)
+def check_budget(selected_places, manual_budgets, budget):
+    if not selected_places or not budget:
+        return ""
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     manual_budgets = manual_budgets or {}
     total_cost = 0
     for place_id in selected_places:
         total_cost += manual_budgets.get(place_id, 0)
+<<<<<<< HEAD
         
     if total_cost > budget:
         return html.Span(f"⚠️ 目前分配預算約 {total_cost:.0f}，已超出預算 {budget}。", style={"color": "red"})
         
+=======
+
+    if total_cost > budget:
+        return html.Span(f"⚠️ 目前分配預算約 {total_cost:.0f}，已超出預算 {budget}。", style={"color": "red"})
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     return html.Span(f"目前分配預算約 {total_cost:.0f}，在預算 {budget} 以內。", style={"color": "green"})
 
 
@@ -739,7 +972,11 @@ def check_budget(selected_places, manual_budgets, budget):
 def show_selected_itinerary(selected_places, manual_budgets, all_details):
     if not selected_places:
         return html.Div("尚未選擇任何地點。", style={"color": "#777"})
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     manual_budgets = manual_budgets or {}
     items = []
     for i, pid in enumerate(selected_places):
@@ -748,7 +985,11 @@ def show_selected_itinerary(selected_places, manual_budgets, all_details):
         addr = p.get("vicinity", "無")
         rating = p.get("rating", "無")
         dist = p.get("distance_km", 0.0)
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
         stored_cost = manual_budgets.get(pid)
         initial_val = stored_cost if stored_cost is not None else get_estimated_cost(p.get("price_level"))
 
@@ -757,11 +998,21 @@ def show_selected_itinerary(selected_places, manual_budgets, all_details):
                 [
                     html.Div(
                         [
+<<<<<<< HEAD
                             html.Span(f"{i+1}. ", style={"fontWeight": "bold", "marginRight": "5px"}),
                             html.Span(name, style={"fontWeight": "bold"}),
                             html.Span([
                                 html.Button("↑", id={"type": "move-up", "index": pid}, style={"marginLeft": "5px", "padding": "0 5px"}),
                                 html.Button("↓", id={"type": "move-down", "index": pid}, style={"marginLeft": "2px", "padding": "0 5px"}),
+=======
+                            html.Span(f"{i + 1}. ", style={"fontWeight": "bold", "marginRight": "5px"}),
+                            html.Span(name, style={"fontWeight": "bold"}),
+                            html.Span([
+                                html.Button("↑", id={"type": "move-up", "index": pid},
+                                            style={"marginLeft": "5px", "padding": "0 5px"}),
+                                html.Button("↓", id={"type": "move-down", "index": pid},
+                                            style={"marginLeft": "2px", "padding": "0 5px"}),
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
                             ], style={"float": "right"})
                         ],
                         style={"marginBottom": "2px"}
@@ -793,7 +1044,11 @@ def show_selected_itinerary(selected_places, manual_budgets, all_details):
                 style={"marginBottom": "10px", "paddingBottom": "4px", "borderBottom": "1px solid #eee"}
             )
         )
+<<<<<<< HEAD
     return html.Ol(items, style={"paddingLeft": "0px", "listStyleType": "none"}) 
+=======
+    return html.Ol(items, style={"paddingLeft": "0px", "listStyleType": "none"})
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
 
 
 # ----------------------------------------------------
@@ -810,7 +1065,12 @@ def show_selected_itinerary(selected_places, manual_budgets, all_details):
 def render_pie_charts(selected_places, manual_budgets, total_budget, all_details):
     empty_figure = {
         'data': [{'type': 'pie', 'labels': ['無資料'], 'values': [1], 'marker': {'colors': ['#f0f0f0']}}],
+<<<<<<< HEAD
         'layout': {'title': {'text': '無選定行程', 'font': {'size': 16}}, 'margin': {'t': 40, 'b': 20, 'l': 0, 'r': 0}, 'showlegend': False}
+=======
+        'layout': {'title': {'text': '無選定行程', 'font': {'size': 16}}, 'margin': {'t': 40, 'b': 20, 'l': 0, 'r': 0},
+                   'showlegend': False}
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     }
 
     if not selected_places:
@@ -821,7 +1081,11 @@ def render_pie_charts(selected_places, manual_budgets, total_budget, all_details
     budget_values = []
     total_spent = 0
     category_counts = {}
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     for pid in selected_places:
         p = all_details.get(pid, {})
         name = p.get("name", "未知")
@@ -829,18 +1093,30 @@ def render_pie_charts(selected_places, manual_budgets, total_budget, all_details
         budget_labels.append(name)
         budget_values.append(cost)
         total_spent += cost
+<<<<<<< HEAD
             
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
         primary_type = p.get("primary_type", "其他")
         category_counts[primary_type] = category_counts.get(primary_type, 0) + 1
 
     remaining_budget = max(total_budget - total_spent, 0) if total_budget else 0
     budget_data = []
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     if any(v > 0 for v in budget_values):
         if total_budget and remaining_budget > 0:
             budget_labels.append(f"剩餘預算 ({remaining_budget:.0f})")
             budget_values.append(remaining_budget)
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
         budget_data = [
             {
                 'type': 'pie',
@@ -856,11 +1132,19 @@ def render_pie_charts(selected_places, manual_budgets, total_budget, all_details
     else:
         budget_data = empty_figure['data']
         budget_title = "預算分配中..."
+<<<<<<< HEAD
         
     budget_figure = {
         'data': budget_data,
         'layout': {
             'title': {'text': budget_title, 'font': {'size': 16}}, 
+=======
+
+    budget_figure = {
+        'data': budget_data,
+        'layout': {
+            'title': {'text': budget_title, 'font': {'size': 16}},
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
             'margin': {'t': 40, 'b': 20, 'l': 0, 'r': 0},
             'showlegend': True
         }
@@ -887,9 +1171,16 @@ def render_pie_charts(selected_places, manual_budgets, total_budget, all_details
             'showlegend': True
         }
     }
+<<<<<<< HEAD
     
     return budget_figure, category_figure
     
+=======
+
+    return budget_figure, category_figure
+
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
 # 📌 CALLBACK 1: 控制彈窗開啟/關閉狀態
 @app.callback(
     Output("modal-trigger-state", "data"),
@@ -908,7 +1199,11 @@ def update_modal_trigger_state(detail_clicks, backdrop_clicks, close_clicks, cur
 
     trigger_prop = ctx.triggered[0]["prop_id"]
     trigger_id = trigger_prop.split(".")[0]
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     if trigger_id == "detail-backdrop" or "close-detail" in trigger_id:
         if current_state.get("open"):
             return {"open": False, "pid": None}
@@ -926,16 +1221,28 @@ def update_modal_trigger_state(detail_clicks, backdrop_clicks, close_clicks, cur
     if place_id:
         if not current_state.get("open") or current_state.get("pid") != place_id:
             return {"open": True, "pid": place_id}
+<<<<<<< HEAD
         
     return no_update
 
+=======
+
+    return no_update
+
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
 # 📌 CALLBACK 2: 渲染彈窗內容
 @app.callback(
     Output("detail-modal", "children"),
     Output("detail-modal", "style"),
     Output("detail-backdrop", "style"),
+<<<<<<< HEAD
     Output("detail-cache", "data"), 
     Input("modal-trigger-state", "data"), 
+=======
+    Output("detail-cache", "data"),
+    Input("modal-trigger-state", "data"),
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     State("detail-cache", "data"),
     prevent_initial_call=True,
 )
@@ -944,18 +1251,30 @@ def render_detail_modal(trigger_state, cache):
 
     is_open = trigger_state.get("open", False)
     place_id = trigger_state.get("pid")
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     if not is_open or not place_id:
         modal_style = {
             "position": "fixed", "top": "50%", "left": "50%", "transform": "translate(-50%, -50%)",
             "backgroundColor": "white", "border": "1px solid #ccc", "borderRadius": "6px",
             "padding": "16px", "boxShadow": "0 2px 8px rgba(0,0,0,0.3)",
             "zIndex": 1000, "width": "420px", "maxHeight": "70vh", "overflowY": "auto",
+<<<<<<< HEAD
             "display": "none", 
         }
         backdrop_style = {
             "position": "fixed", "top": 0, "left": 0, "width": "100vw", "height": "100vh",
             "backgroundColor": "rgba(0,0,0,0.3)", "zIndex": 999, "display": "none", 
+=======
+            "display": "none",
+        }
+        backdrop_style = {
+            "position": "fixed", "top": 0, "left": 0, "width": "100vw", "height": "100vh",
+            "backgroundColor": "rgba(0,0,0,0.3)", "zIndex": 999, "display": "none",
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
         }
         return html.Div(), modal_style, backdrop_style, no_update
 
@@ -967,8 +1286,13 @@ def render_detail_modal(trigger_state, cache):
         new_cache = no_update
     else:
         try:
+<<<<<<< HEAD
             result, reviews = fetch_place_details(place_id) 
             cache[place_id] = {"result": result, "reviews": reviews} 
+=======
+            result, reviews = fetch_place_details(place_id)
+            cache[place_id] = {"result": result, "reviews": reviews}
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
             new_cache = cache
         except Exception:
             return html.Div("詳情加載失敗"), no_update, no_update, no_update
@@ -980,14 +1304,22 @@ def render_detail_modal(trigger_state, cache):
     phone = result.get("formatted_phone_number")
     website = result.get("website")
     open_status = result.get("opening_hours", {}).get("open_now")
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     if open_status is True:
         open_text = html.Span("✅ 營業中", style={"color": "green", "fontWeight": "bold"})
     elif open_status is False:
         open_text = html.Span("❌ 已歇業或未營業", style={"color": "red", "fontWeight": "bold"})
     else:
         open_text = html.Span("N/A", style={"color": "#777"})
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     review_blocks = []
     for rv in reviews:
         author = rv.get("author_name", "匿名")
@@ -1003,11 +1335,21 @@ def render_detail_modal(trigger_state, cache):
                 html.Div(text, style={"fontSize": 13, "color": "#444", "marginBottom": "6px"}),
             ], style={"marginBottom": "8px", "paddingLeft": "10px", "borderLeft": "2px solid #ddd"})
         )
+<<<<<<< HEAD
         
     content = html.Div([
         html.Div([
             html.Span(name, style={"fontSize": 18, "fontWeight": "bold"}),
             html.Button("關閉", id={"type": "close-detail", "index": place_id}, n_clicks=0, style={"float": "right", "fontSize": 12, "padding": "2px 8px", "border": "1px solid #ccc", "borderRadius": "4px", "cursor": "pointer"}),
+=======
+
+    content = html.Div([
+        html.Div([
+            html.Span(name, style={"fontSize": 18, "fontWeight": "bold"}),
+            html.Button("關閉", id={"type": "close-detail", "index": place_id}, n_clicks=0,
+                        style={"float": "right", "fontSize": 12, "padding": "2px 8px", "border": "1px solid #ccc",
+                               "borderRadius": "4px", "cursor": "pointer"}),
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
         ], style={"marginBottom": "8px", "borderBottom": "1px solid #eee", "paddingBottom": "8px"}),
         html.Div(f"地址：{addr}", style={"fontSize": 14, "marginBottom": "4px"}),
         html.Div([
@@ -1023,7 +1365,11 @@ def render_detail_modal(trigger_state, cache):
         html.Div("最新評論（最多 3 則）：", style={"fontWeight": "bold", "marginBottom": "6px"}),
         *(review_blocks if review_blocks else [html.Div("無評論資訊", style={"color": "#777"})]),
     ])
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     modal_style = {
         "position": "fixed", "top": "50%", "left": "50%", "transform": "translate(-50%, -50%)",
         "backgroundColor": "white", "border": "1px solid #ccc", "borderRadius": "6px",
@@ -1035,7 +1381,11 @@ def render_detail_modal(trigger_state, cache):
         "position": "fixed", "top": 0, "left": 0, "width": "100vw", "height": "100vh",
         "backgroundColor": "rgba(0,0,0,0.3)", "zIndex": 999, "display": "block",
     }
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> b304546a8b646471e521a3e3ae4380f41e090e94
     return content, modal_style, backdrop_style, new_cache
 
 
