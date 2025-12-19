@@ -547,7 +547,7 @@ def fetch_place_details(place_id):
             "https://maps.googleapis.com/maps/api/place/details/json",
             params={
                 "place_id": place_id, "key": API_KEY, "language": "zh-TW",
-                "fields": "name,rating,formatted_address,formatted_phone_number,website,review,price_level,user_ratings_total,opening_hours",
+                "fields": "name,rating,formatted_address,formatted_phone_number,website,review,price_level,user_ratings_total,opening_hours,url",
             },
         ).json()
         result = resp.get("result", {})
@@ -1336,6 +1336,12 @@ def render_modal_content(state, cache):
         html.P([html.Strong("地址: "), res.get("formatted_address")]),
         html.P([html.Strong("電話: "), res.get("formatted_phone_number", "無")]),
         html.P([html.Strong("狀態: "), html.Span(status_text, style={"color": "green" if open_now else "red"})]),
+        # 如果店家有官網，也可以順便加上
+        html.P([
+            html.Strong("官方網站: "),
+            html.A("點擊前往", href=res.get("website"), target="_blank", 
+                   style={"color": "#1976D2", "textDecoration": "underline"}) if res.get("website") else "無提供"
+        ]),
         html.Hr(),
         html.H4("最新評論"),
         html.Div([
