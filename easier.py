@@ -826,4 +826,4 @@ def render_modal_content(state, cache):
     return {**STYLES["modal_content"], "display": "block"}, {**STYLES["modal_overlay"], "display": "block"}, content, cache
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=8050)
+    app.run()
