@@ -40,7 +40,7 @@ login_manager.login_view = '/login'
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 # 修改 DB_NAME 的定義（約第 35 行）
 # 請將這裡改成你電腦上的絕對路徑，且確保資料夾已手動建立
-DB_NAME = r"D:\data\Documents\GitHub\midterm_new\Midterm\users.db"
+DB_NAME = r"C:\Users\userz\Documents\GitHub\Midterm\users.db"
 
 # 建議在這裡加一行 print，啟動時你就能在終端機看到正確路徑
 print(f"✅ 資料庫絕對路徑設定為: {DB_NAME}")
