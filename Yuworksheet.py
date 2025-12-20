@@ -16,7 +16,6 @@ app.config.suppress_callback_exceptions = True
 
 # 注意：請將此 API_KEY 替換為您自己的 Google Places API Key
 # 警告：此處的 API Key 僅為範例，不應在實際應用中公開
-API_KEY = ""
 
 CATEGORY_TYPE_MAP = {
     "food": ["restaurant", "cafe", "bar", "bakery"],
