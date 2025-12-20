@@ -875,7 +875,7 @@ def search_and_build_options(submit_addr, submit_budget, n_clicks, address, budg
 
     # 以評論數排序作為「熱門程度」（若 nearby 未提供則會嘗試用 details API 取得）
     nearby_scored = calculate_popularity_score(nearby, apikey=API_KEY)
-    max_pl = 1 if budget <= 200 else 2 if budget <= 400 else 3 if budget <= 1400 else 4
+    max_pl = 1 if budget <= 200 else 2 if budget <= 600 else 3 if budget <= 1000 else 4
 
     new_details = old_details.copy() if old_details else {}
     options = []
@@ -1128,7 +1128,9 @@ def render_page(all_options, page, selected_values, all_details):
         pid = opt["value"]
         p = all_details.get(pid, {})
         photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=180&photo_reference={p.get('photo_reference')}&key={API_KEY}" if p.get("photo_reference") else None
-
+       # 轉換價格等級為 $ 符號
+        pl_int = p.get("price_level_int")
+        price_display = "價格： " + ("$" * pl_int) if pl_int else "價格： 未知"
         cards.append(html.Div([
             dcc.Checklist(
                 options=[{"label": "", "value": pid}],
@@ -1143,11 +1145,15 @@ def render_page(all_options, page, selected_values, all_details):
                     html.Span(f" ｜ 熱門程度 {p.get('popularity_score', 0)}", style={"color": "#ffa000", "marginLeft": "4px"})
                 ]),
                 html.Div(f"地址：{p.get('vicinity', '無')}", style={"color": "#555", "fontSize": 14}),
-                html.Div(f"評分：{p.get('rating', '無')} ｜ 距離：{p.get('distance_km', 0):.2f} km", style={"color": "#777", "fontSize": 13}),
+                html.Div([
+                    html.Span(f"評分：{p.get('rating', '無')} ｜ "),
+                    html.Span(price_display, style={"color": "#2e7d32", "fontWeight": "bold"}), # 綠色加粗顯示
+                    html.Span(f" ｜ 距離：{p.get('distance_km', 0):.2f} km")
+                ], style={"color": "#777", "fontSize": 13}),
                 html.Button("查看詳情", id={"type": "detail-btn", "index": pid}, style={"marginTop": "4px", "fontSize": 13, "padding": "2px 8px"})
             ], style={"width": "calc(100% - 130px)"})
         ], style={"display": "flex", "alignItems": "center", "marginBottom": "10px", "borderBottom": "1px solid #eee", "paddingBottom": "10px"}))
-
+    
     max_page = max((len(all_options) - 1) // PAGE_SIZE + 1, 1)
     return cards, f"第 {page + 1} / {max_page} 頁"
 
@@ -1210,38 +1216,58 @@ def sync_selection(checks, removes, ups, downs, current):
 )
 def update_budget_logic(input_vals, selected, input_ids, store, total_budget, all_details):
     store = store or {}
+    level_price_map = {1: 200, 2: 600, 3: 1000, 4: 2000}
+    
+    # 1. 處理使用者手動輸入的數值
     if callback_context.triggered:
         trigger_prop = callback_context.triggered[0]["prop_id"]
         if "budget-input" in trigger_prop:
             for val, id_obj in zip(input_vals, input_ids):
                 store[id_obj["index"]] = val if val is not None else 0
 
-    current_total = sum(store.get(pid, 0) for pid in (selected or []))
-    level_price_map = {1: 200, 2: 400, 3: 1000, 4: 2000}
+    # 2. ✅ 自動帶入邏輯：當新地點加入且 store 裡還沒這筆資料時，按 Map 給初始值
     if selected and all_details:
         for pid in selected:
             if pid not in store:
-                pl = all_details.get(pid, {}).get("price_level_int", 1)
-                est = level_price_map.get(pl, 200)
-                store[pid] = est
-                current_total += est
+                pl = all_details.get(pid, {}).get("price_level_int")
+                # 這裡執行您的需求：1->200, 2->600...
+                store[pid] = level_price_map.get(pl, 200) if pl else 200
+
+    # 3. 重新計算總額
+    current_total = sum(store.get(pid, 0) for pid in (selected or []))
+    
     color = "red" if total_budget and current_total > total_budget else "green"
     msg = f"目前分配預算約 {current_total:.0f}，{'已超出' if color=='red' else '在'} 預算 {total_budget or 0} 範圍內。"
+    
     return store, html.Span(msg, style={"color": color, "fontWeight": "bold"})
 
 @app.callback(
     Output("selected-itinerary", "children"),
     Input("place-selector", "value"),
-    State("manual-budget-store", "data"),
+    Input("manual-budget-store", "data"),  # ✅ 改為 Input：讓預算變化時重新繪製列表
     State("all-place-details", "data"),
 )
 def render_selected(selected, budgets, details):
-    if not selected: return html.Div("尚未選擇任何地點。", style={"color": "#777"})
+    if not selected: 
+        return html.Div("尚未選擇任何地點。", style={"color": "#777"})
+    
     items = []
     budgets = budgets or {}
+    details = details or {}
+    
+    # 預算對照表（保險起見，這裡也放一份邏輯）
+    level_price_map = {1: 200, 2: 600, 3: 1000, 4: 2000}
+
     for i, pid in enumerate(selected):
         p = details.get(pid, {})
-        cost = budgets.get(pid, 200)
+        
+        # ✅ 修正取值邏輯：優先從已計算的 budgets 拿，拿不到才根據 Level 算
+        if pid in budgets:
+            cost = budgets[pid]
+        else:
+            pl = p.get("price_level_int")
+            cost = level_price_map.get(pl, 200) if pl else 200
+
         items.append(html.Li([
             html.Div([
                 html.Span(f"{i+1}. {p.get('name')}", style={"fontWeight": "bold"}),
@@ -1252,7 +1278,14 @@ def render_selected(selected, budgets, details):
             ]),
             html.Div([
                 html.Span("預算: "),
-                dcc.Input(id={"type": "budget-input", "index": pid}, type="number", value=cost, debounce=True, style={"width": "80px"}),
+                # ✅ 這裡的 value={cost} 現在會正確顯示 200, 600, 1000, 2000
+                dcc.Input(
+                    id={"type": "budget-input", "index": pid}, 
+                    type="number", 
+                    value=cost, 
+                    debounce=True, 
+                    style={"width": "80px"}
+                ),
                 html.Button("移除", id={"type": "remove-btn", "index": pid}, style={"marginLeft":"10px", "color":"red", "fontSize":12})
             ], style={"marginTop": "5px"}),
         ], style={"marginBottom": "10px", "borderBottom": "1px solid #eee", "paddingBottom": "5px"}))
