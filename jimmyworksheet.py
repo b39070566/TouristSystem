@@ -1,3 +1,4 @@
+import os
 import dash
 from dash import dcc, html, Output, Input, State, no_update, callback_context
 from dash.dependencies import ALL
@@ -5,15 +6,16 @@ import requests
 import json
 import math
 import sqlite3
-import os
 from datetime import datetime
 import ast
 import threading
-import os
+from dotenv import load_dotenv
 
 from flask import Flask, redirect
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+
+# ...existing code...
 
 # ----------------------------------------------------
 # 🔐 設定與資料庫初始化 (SQLite & Flask-Login)
@@ -23,7 +25,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 server = Flask(__name__)
 server.secret_key = 'CHANGE_THIS_SECRET_KEY_IN_PRODUCTION'  # 用於 Session 加密
 
-app = dash.Dash(__name__, server=server)
+# 使用專案中的 `assets` 資料夾來載入全域 CSS（例如 assets/style.css）
+app = dash.Dash(__name__, server=server, assets_folder='assets')
 app.config.suppress_callback_exceptions = True  # 必須開啟，因為我們是動態切換 Layout
 
 # 初始化 LoginManager
@@ -40,7 +43,7 @@ login_manager.login_view = '/login'
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 # 修改 DB_NAME 的定義（約第 35 行）
 # 請將這裡改成你電腦上的絕對路徑，且確保資料夾已手動建立
-DB_NAME = r"d:\Users\master_file\PythonCode_Basic\Midterm-main\users.db"
+DB_NAME = r"C:\Users\userz\Documents\GitHub\Midterm\users.db"
 
 # 建議在這裡加一行 print，啟動時你就能在終端機看到正確路徑
 print(f"✅ 資料庫絕對路徑設定為: {DB_NAME}")
@@ -402,17 +405,24 @@ STYLES = {
         "fontFamily": "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", "fontSize": 16,
     },
     "input_group": {
-        "display": "flex", "flexWrap": "wrap", "alignItems": "center", "gap": "8px", "marginBottom": "10px",
+        "display": "flex", "flexWrap": "wrap", "alignItems": "center", "gap": "6px", "marginBottom": "10px",
+        "backgroundColor": "#F5F1ED", "borderRadius": "999px", "padding": "12px 16px", "border": "1px solid #E8DDD4",
+        "boxShadow": "0 4px 12px rgba(0,0,0,0.08)", "width": "fit-content"
     },
-    "input_text": {"fontSize": 16, "width": "320px", "padding": "6px 8px"},
-    "input_budget": {"fontSize": 16, "width": "180px", "padding": "6px 8px"},
+    "input_text": {"fontSize": 16, "width": "320px", "padding": "6px 8px", "borderRadius": "999px", "border": "1px solid #ddd"},
+    "input_budget": {"fontSize": 16, "width": "180px", "padding": "6px 8px", "borderRadius": "999px", "border": "1px solid #ddd"},
     "btn_primary": {
-        "fontSize": 16, "padding": "8px 20px", "backgroundColor": "#1976D2",
-        "color": "white", "border": "none", "borderRadius": "4px", "cursor": "pointer",
+        "fontSize": 16, "padding": "8px 20px", "backgroundColor": "#56602D",
+        "color": "white", "border": "none", "borderRadius": "999px", "cursor": "pointer",
     },
     "card_container": {
         "border": "1px solid #ddd", "borderRadius": "4px", "padding": "10px",
         "maxHeight": "450px", "overflowY": "auto", "backgroundColor": "#fafafa",
+    },
+    "panel_round": {
+        "backgroundColor": "#fff", "border": "1px solid #eee",
+        "borderRadius": "24px", "padding": "16px",
+        "boxShadow": "0 8px 24px rgba(0,0,0,0.08)", "minHeight": "75px",
     },
     "modal_overlay": {
         "position": "fixed", "top": 0, "left": 0, "width": "100vw", "height": "100vh",
@@ -483,7 +493,7 @@ def normalize_place_data(place, user_lat, user_lng):
     primary_type = "其他"
     for k, v in CATEGORY_TYPE_MAP.items():
         if any(t in place_types for t in v):
-            primary_type = "美食" if k == "food" else "娛樂/逛街"
+            primary_type = "美食" if k == "food" else "娛樂"
             break
     place["primary_type"] = primary_type
 
@@ -594,97 +604,113 @@ def get_app_layout(username):
     stored_details  = stored.get("details", {})
 
     return html.Div([
-        # Header: 顯示使用者與登出按鈕
         html.Div([
-            html.Span(f"👋 Hi, {username}", style={"fontWeight": "bold", "marginRight": "15px"}),
-            dcc.Link(html.Button("登出", style={"fontSize": "14px", "padding": "4px 10px", "cursor": "pointer"}), href="/logout"),
-        ], style={"textAlign": "right", "marginBottom": "10px"}),
-
-        dcc.Loading(
-            id="loading-search", type="circle", fullscreen=True, color="#0B16EA",
-            style={"transform": "scale(2)"}, children=dcc.Store(id="loading-trigger-store")
-        ),
-
-        html.Div([
-            html.H1("附近行程智慧推薦", style={"marginBottom": "5px"}),
-            html.P("輸入出發地與預算，系統將為您推薦最佳行程。", style={"marginTop": "0px", "color": "#555"}),
-        ], style={"textAlign": "left", "marginBottom": "20px"}),
-
-        html.Div([
-            dcc.Input(
-                id="address", type="text", placeholder="輸入出發地址，例如：台北車站", style=STYLES["input_text"]
-            ),
-            dcc.Input(
-                id="budget", type="number", placeholder="預算上限 (TWD)", value=1000, style=STYLES["input_budget"]
-            ),
-            dcc.Dropdown(
-                id="category",
-                options=[{"label": "美食", "value": "food"}, {"label": "娛樂 / 逛街", "value": "fun"}],
-                value=["food", "fun"],
-                multi=True, clearable=False,
-                style={"width": "260px", "verticalAlign": "middle"}
-            ),
-            html.Button("查詢", id="search-btn", n_clicks=0, style=STYLES["btn_primary"]),
-        ], style=STYLES["input_group"]),
-
-        html.Div(id="budget-warning", style={"marginTop": "5px", "marginBottom": "15px", "fontSize": 16}),
-
-        html.Div([
+            # Header: 顯示使用者與登出按鈕 
             html.Div([
-                html.H3("推薦地點", style={"marginBottom": "10px"}),
-                html.Div(
-                    id="result-container",
-                    children=html.Div("請輸入地址並查詢...", style={"color": "#777"}),
-                    style=STYLES["card_container"]
-                ),
-                html.Div([
-                    html.Button("上一頁", id="prev-page", n_clicks=0, style={"marginRight": "10px"}),
-                    html.Span(id="page-info", style={"marginRight": "10px"}),
-                    html.Button("下一頁", id="next-page", n_clicks=0),
-                ], style={"marginTop": "10px"}),
-            ], style={"flex": "2", "marginRight": "20px"}),
+                html.Span(f"👋 Hi, {username}", style={"fontWeight": "bold", "marginRight": "15px"}),
+                dcc.Link(html.Button("登出", style={"fontSize": "14px", "padding": "4px 10px", "cursor": "pointer", "backgroundColor": "transparent", "border": "1px solid #3d1b05", "color": "#3d1b05"}), href="/logout"),
+            ], style={"display": "flex", "alignItems": "center", "gap": "10px", "marginBottom": "10px", "marginLeft": "auto", "width": "fit-content"}),
+
+            dcc.Loading(
+                id="loading-search", type="circle", fullscreen=True, color="#0B16EA",
+                style={"transform": "scale(2)"}, children=dcc.Store(id="loading-trigger-store")
+            ),
 
             html.Div([
                 html.Div([
-                    html.H3("已選行程", style={"marginBottom": "10px", "display": "inline-block", "marginRight": "10px"}),
-                    html.Button("儲存行程並查看歷史", id="save-itinerary-btn", n_clicks=0, style={"fontSize": 13, "padding": "6px 10px"}),
-                ], style={"display": "flex", "alignItems": "center", "justifyContent": "space-between"}),
-                html.Div(
-                    id="selected-itinerary",
-                    style={**STYLES["card_container"], "backgroundColor": "#fff", "minHeight": "80px"}
-                ),
-            ], style={"flex": "1"}),
-        ], style={"display": "flex", "flexDirection": "row", "marginBottom": "20px"}),
+                    html.H1("附近行程智慧推薦", className="section-title", style={"marginBottom": "5px"}),
+                    html.P("輸入出發地與預算，系統將為您推薦最佳行程。", style={"marginTop": "0px", "color": "#555"}),
+                ], style={"textAlign": "left", "marginBottom": "20px"}),
 
-        html.Div([
-            html.H3("行程分析", style={"marginBottom": "10px"}),
+                html.Div([
+                    html.Div([
+                        dcc.Input(
+                            id="address", type="text", placeholder="輸入出發地址，例如：台北車站", style=STYLES["input_text"]
+                        ),
+                        html.Span("*", style={"color": "red", "fontWeight": "bold", "marginLeft": "4px", "fontSize": "16px"}),
+                    ], style={"display": "flex", "alignItems": "center", "gap": "2px"}),
+                    html.Div([
+                        dcc.Input(
+                            id="budget", type="number", placeholder="預算上限 (TWD)", value=1000, style=STYLES["input_budget"]
+                        ),
+                        html.Span("*", style={"color": "red", "fontWeight": "bold", "marginLeft": "4px", "fontSize": "16px"}),
+                    ], style={"display": "flex", "alignItems": "center", "gap": "2px"}),
+                    dcc.Dropdown(
+                        id="category",
+                        options=[{"label": "美食", "value": "food"}, {"label": "娛樂", "value": "fun"}],
+                        value=["food", "fun"],
+                        multi=True, clearable=False,
+                        style={"width": "260px", "verticalAlign": "middle"}
+                    ),
+                    html.Button("查詢", id="search-btn", n_clicks=0, style=STYLES["btn_primary"]),
+                ], style=STYLES["input_group"]),
+
+                html.Div(id="budget-warning", style={"marginTop": "5px", "marginBottom": "15px", "fontSize": 16}),
+
+                html.Div([
+                    html.Div([
+                        html.H3("推薦地點", style={"marginBottom": "10px"}),
+                    html.Div(
+                        id="result-container",
+                        children=html.Div("無搜尋結果", style={"color": "#999", "textAlign": "center", "padding": "40px"}),
+                        style=STYLES["card_container"]
+                    ),
+                    html.Div([
+                        html.Button("上一頁", id="prev-page", n_clicks=0, style={"marginRight": "10px", "backgroundColor": "#56602D", "color": "white", "border": "none", "borderRadius": "999px", "padding": "6px 16px", "cursor": "pointer"}),
+                        html.Span(id="page-info", style={"marginRight": "10px"}),
+                        html.Button("下一頁", id="next-page", n_clicks=0, style={"backgroundColor": "#56602D", "color": "white", "border": "none", "borderRadius": "999px", "padding": "6px 16px", "cursor": "pointer"}),
+                    ], style={"marginTop": "10px", "display": "flex", "justifyContent": "center", "alignItems": "center"}),
+                ], style={**STYLES["panel_round"], "flex": "1", "marginRight": "20px"}),
+
+                html.Div([
+                    html.Div([
+                        html.H3("已選行程", style={"marginBottom": "10px", "display": "inline-block", "marginRight": "10px"}),
+                        html.Button("儲存行程並查看歷史", id="save-itinerary-btn", n_clicks=0, style={"fontSize": 13, "padding": "6px 16px", "backgroundColor": "#56602D", "color": "white", "border": "none", "borderRadius": "999px", "cursor": "pointer"}),
+                    ], style={"display": "flex", "alignItems": "center", "justifyContent": "space-between"}),
+                    html.Div(
+                        id="selected-itinerary",
+                        style={**STYLES["card_container"], "backgroundColor": "#fff", "minHeight": "50px"}
+                    ),
+                ], style={**STYLES["panel_round"], "flex": "1"}),
+            ], style={"display": "flex", "flexDirection": "row", "marginBottom": "20px"}),
+            ], style={"display": "flex", "flexDirection": "column"}),
+
             html.Div([
-                dcc.Graph(id="budget-pie-chart", style={"width": "50%"}, config={"displayModeBar": False}),
-                dcc.Graph(id="category-pie-chart", style={"width": "50%"}, config={"displayModeBar": False}),
-            ], style={"display": "flex"}),
-        ], style={"borderTop": "1px solid #eee", "paddingTop": "20px"}),
+                html.Div([
+                    html.H3("預算分析", style={"marginBottom": "10px"}),
+                    dcc.Graph(id="budget-pie-chart", style={"width": "100%", "height": "300px"}, config={"displayModeBar": False}),
+                ], style={**STYLES["panel_round"], "marginRight": "20px", "overflowY": "hidden", "flex": "1", "minWidth": "0"}),
 
-        # ✅ 只改初始值：載入上次選取
-        dcc.Checklist(id="place-selector", options=[], value=stored_selected, style={"display": "none"}),
+                html.Div([
+                    html.H3("類別分析", style={"marginBottom": "10px"}),
+                    dcc.Graph(id="category-pie-chart", style={"width": "100%", "height": "300px"}, config={"displayModeBar": False}),
+                ], style={**STYLES["panel_round"], "overflowY": "hidden", "flex": "1", "minWidth": "0"}),
+            ], style={"display": "flex", "flexDirection": "row", "marginBottom": "20px"}),
 
-        # ✅ 只改初始值：載入上次 details（讓右側/圖表能顯示名稱等）
-        dcc.Store(id="all-place-details", data=stored_details),
+            # ✅ 只改初始值：載入上次選取
+            dcc.Checklist(id="place-selector", options=[], value=stored_selected, style={"display": "none"}),
 
-        dcc.Store(id="all-options", data=[]),
-        dcc.Store(id="page", data=0),
-        dcc.Store(id="detail-cache", data={}),
-        dcc.Store(id="modal-trigger-state", data={"open": False, "pid": None}),
+            # ✅ 只改初始值：載入上次 details（讓右側/圖表能顯示名稱等）
+            dcc.Store(id="all-place-details", data=stored_details),
 
-        # ✅ 只改初始值：載入上次手動預算
-        dcc.Store(id="manual-budget-store", data=stored_budgets),
+            dcc.Store(id="all-options", data=[]),
+            dcc.Store(id="page", data=0),
+            dcc.Store(id="detail-cache", data={}),
+            dcc.Store(id="modal-trigger-state", data={"open": False, "pid": None}),
 
-        # ✅ 新增：不影響 UI 的 dummy store，用來觸發存檔 callback
-        dcc.Store(id="itinerary-persist-dummy", data=None),
+            # ✅ 只改初始值：載入上次手動預算
+            dcc.Store(id="manual-budget-store", data=stored_budgets),
 
-        html.Div(id='detail-backdrop', n_clicks=0, style=STYLES["modal_overlay"]),
-        html.Div(id='detail-modal', children="載入中...", style=STYLES["modal_content"]),
+            # ✅ 新增：不影響 UI 的 dummy store，用來觸發存檔 callback
+            dcc.Store(id="itinerary-persist-dummy", data=None),
+
+            html.Div(id='detail-backdrop', n_clicks=0, style=STYLES["modal_overlay"]),
+            html.Div(id='detail-modal', children="載入中...", style=STYLES["modal_content"]),
+
+        ], style={"margin": "0 auto", "display": "flex", "flexDirection": "column", "width": "fit-content"}),
 
     ], style=STYLES["container"])
+    
 
 # --- 根 Layout：負責控制所有頁面切換 ---
 app.layout = html.Div([
@@ -1116,7 +1142,7 @@ def new_itinerary(n_clicks):
 )
 def render_page(all_options, page, selected_values, all_details):
     if not all_options:
-        return html.Div("無搜尋結果，請嘗試其他地址或增加預算。", style={"color": "#777"}), ""
+        return html.Div("無搜尋結果，請嘗試其他地址或增加預算。", style={"color": "#777", "textAlign": "center", "fontWeight": "bold"}), ""
 
     page = page or 0
     start, end = page * PAGE_SIZE, (page + 1) * PAGE_SIZE
@@ -1225,9 +1251,37 @@ def update_budget_logic(input_vals, selected, input_ids, store, total_budget, al
                 est = level_price_map.get(pl, 200)
                 store[pid] = est
                 current_total += est
-    color = "red" if total_budget and current_total > total_budget else "green"
-    msg = f"目前分配預算約 {current_total:.0f}，{'已超出' if color=='red' else '在'} 預算 {total_budget or 0} 範圍內。"
-    return store, html.Span(msg, style={"color": color, "fontWeight": "bold"})
+    total_budget = total_budget or 0
+    percent_used = (current_total / total_budget) if total_budget > 0 else 0
+    percent_clamped = max(0, min(percent_used, 1))
+    width_str = f"{percent_clamped * 100:.1f}%" if total_budget > 0 else "0%"
+
+    over_budget = total_budget > 0 and current_total > total_budget
+    color = "red" if over_budget else "green"
+    msg = f"目前分配預算約 {current_total:.0f}，{'已超出' if color=='red' else '在'} 預算 {total_budget} 範圍內。"
+
+    progress_bar = html.Div([
+        html.Div([
+            html.Div(
+                style={
+                    "width": width_str,
+                    "height": "100%",
+                    "backgroundColor": "#458a4b",
+                    "borderRadius": "999px",
+                    "transition": "width 0.25s ease"
+                }
+            )
+        ], style={
+            "height": "14px",
+            "backgroundColor": "#C0D5BC",
+            "borderRadius": "999px",
+            "overflow": "hidden",
+            "width": "100%",
+        }),
+        html.Span(msg, style={"color": color, "fontWeight": "bold"}),
+    ], style={"display": "flex", "flexDirection": "column", "gap": "6px"})
+
+    return store, progress_bar
 
 @app.callback(
     Output("selected-itinerary", "children"),
@@ -1236,7 +1290,8 @@ def update_budget_logic(input_vals, selected, input_ids, store, total_budget, al
     State("all-place-details", "data"),
 )
 def render_selected(selected, budgets, details):
-    if not selected: return html.Div("尚未選擇任何地點。", style={"color": "#777"})
+    if not selected: 
+        return html.Div("尚未選擇任何地點", style={"color": "#999", "textAlign": "center", "padding": "40px", "fontWeight": "bold"})
     items = []
     budgets = budgets or {}
     for i, pid in enumerate(selected):

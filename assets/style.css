@@ -1,0 +1,54 @@
+/* Global page background for the whole app */
+html, body {
+  background-color: #e1d4c0 !important;
+  height: 100%;
+  margin: 0;
+}
+
+/* Ensure Dash app root covers full viewport */
+#react-entry-point, .dash-app, .dash-root {
+  min-height: 100vh;
+  background-color: transparent;
+}
+
+/* 附近行程智慧推薦標題顏色 */
+.section-title {
+  color: #3D1B05 !important;
+}
+
+/* 下拉菜單圓角效果 */
+.Select {
+  border-radius: 999px !important;
+}
+
+.Select-control {
+  border-radius: 999px !important;
+  border: 1px solid #ddd !important;
+}
+
+.Select-menu-outer {
+  border-radius: 999px !important;
+}
+
+/* 已選標籤（美食、娛樂）圓角與配色 */
+.Select-value, .Select-value-label {
+  border-radius: 999px !important;
+  background: #F5F1ED !important;
+  border: 1px solid #E8DDD4 !important;
+  color: #333 !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+  display: inline-flex !important;
+  align-items: center;
+}
+
+.Select-value-icon {
+  border-radius: 999px !important;
+}
+
+/* 讓標籤橫向排列且避免垂直堆疊 */
+.Select-value {
+  margin-right: 6px !important;
+  margin-bottom: 0 !important;
+}
+
