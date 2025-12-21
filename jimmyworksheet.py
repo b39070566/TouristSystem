@@ -631,7 +631,13 @@ def get_app_layout(username):
                     ], style={"display": "flex", "alignItems": "center", "gap": "2px"}),
                     html.Div([
                         dcc.Input(
-                            id="budget", type="number", placeholder="預算上限 (TWD)", value=1000, style=STYLES["input_budget"]
+                            id="budget", type="number", placeholder="單點預算限制", value=None, style={"width": "120px", "padding": "6px", "borderRadius": "999px", "border": "1px solid #ddd"}
+                        ),
+                        html.Span("*", style={"color": "red", "fontWeight": "bold", "marginLeft": "4px", "fontSize": "16px"}),
+                    ], style={"display": "flex", "alignItems": "center", "gap": "2px"}),
+                    html.Div([
+                        dcc.Input(
+                            id="total-trip-budget", type="number", placeholder="預算上限 (TWD)", value=1000, style=STYLES["input_budget"]
                         ),
                         html.Span("*", style={"color": "red", "fontWeight": "bold", "marginLeft": "4px", "fontSize": "16px"}),
                     ], style={"display": "flex", "alignItems": "center", "gap": "2px"}),
@@ -646,6 +652,24 @@ def get_app_layout(username):
                 ], style=STYLES["input_group"]),
 
                 html.Div(id="budget-warning", style={"marginTop": "5px", "marginBottom": "15px", "fontSize": 16}),
+
+                # 進度條：顯示預算使用情況
+                html.Div([
+                    html.Div(id="budget-progress-bar", style={
+                        "width": "0%",
+                        "height": "100%",
+                        "backgroundColor": "#458a4b",
+                        "borderRadius": "999px",
+                        "transition": "width 0.3s ease"
+                    })
+                ], style={
+                    "width": "100%",
+                    "height": "14px",
+                    "backgroundColor": "#c0d5bc",
+                    "borderRadius": "999px",
+                    "overflow": "hidden",
+                    "marginBottom": "15px"
+                }),
 
                 html.Div([
                     html.Div([
@@ -901,7 +925,7 @@ def search_and_build_options(submit_addr, submit_budget, n_clicks, address, budg
 
     # 以評論數排序作為「熱門程度」（若 nearby 未提供則會嘗試用 details API 取得）
     nearby_scored = calculate_popularity_score(nearby, apikey=API_KEY)
-    max_pl = 1 if budget <= 200 else 2 if budget <= 400 else 3 if budget <= 1400 else 4
+    max_pl = 1 if budget <= 200 else 2 if budget <= 600 else 3 if budget <= 1000 else 4
 
     new_details = old_details.copy() if old_details else {}
     options = []
@@ -1155,6 +1179,11 @@ def render_page(all_options, page, selected_values, all_details):
         p = all_details.get(pid, {})
         photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=180&photo_reference={p.get('photo_reference')}&key={API_KEY}" if p.get("photo_reference") else None
 
+        # --- 修正處 1：價格等級顯示邏輯 ---
+        pl_int = p.get("price_level_int")
+        # 如果有等級就顯示對應數量的 $，沒有就顯示未知
+        price_display = html.Span("$" * pl_int, style={"color": "#2e7d32", "fontWeight": "bold", "marginLeft": "5px"}) if pl_int else "價格：未知"
+
         cards.append(html.Div([
             dcc.Checklist(
                 options=[{"label": "", "value": pid}],
@@ -1169,11 +1198,16 @@ def render_page(all_options, page, selected_values, all_details):
                     html.Span(f" ｜ 熱門程度 {p.get('popularity_score', 0)}", style={"color": "#ffa000", "marginLeft": "4px"})
                 ]),
                 html.Div(f"地址：{p.get('vicinity', '無')}", style={"color": "#555", "fontSize": 14}),
-                html.Div(f"評分：{p.get('rating', '無')} ｜ 距離：{p.get('distance_km', 0):.2f} km", style={"color": "#777", "fontSize": 13}),
-                html.Button("查看詳情", id={"type": "detail-btn", "index": pid}, style={"marginTop": "4px", "fontSize": 13, "padding": "2px 8px"})
-            ], style={"width": "calc(100% - 130px)"})
-        ], style={"display": "flex", "alignItems": "center", "marginBottom": "10px", "borderBottom": "1px solid #eee", "paddingBottom": "10px"}))
-
+# --- 2. 修改此處：顯示評分、價格與距離 ---
+            html.Div([
+                f"評分：{p.get('rating', '無')} ｜ ",
+                price_display,
+                f" ｜ 距離：{p.get('distance_km', 0):.2f} km"
+            ], style={"color": "#777", "fontSize": 13}),
+            
+            html.Button("查看詳情", id={"type": "detail-btn", "index": pid}, style={"marginTop": "4px", "fontSize": 13, "padding": "2px 8px"})
+        ], style={"width": "calc(100% - 130px)"})
+    ], style={"display": "flex", "alignItems": "center", "marginBottom": "10px", "borderBottom": "1px solid #eee", "paddingBottom": "10px"}))
     max_page = max((len(all_options) - 1) // PAGE_SIZE + 1, 1)
     return cards, f"第 {page + 1} / {max_page} 頁"
 
@@ -1227,76 +1261,130 @@ def sync_selection(checks, removes, ups, downs, current):
 @app.callback(
     Output("manual-budget-store", "data"),
     Output("budget-warning", "children"),
+    Output("budget-progress-bar", "style"),
     Input({"type": "budget-input", "index": ALL}, "value"),
     Input("place-selector", "value"),
+    Input("total-trip-budget", "value"),
+    Input("budget", "value"),
     State({"type": "budget-input", "index": ALL}, "id"),
     State("manual-budget-store", "data"),
-    State("budget", "value"),
     State("all-place-details", "data"),
 )
-def update_budget_logic(input_vals, selected, input_ids, store, total_budget, all_details):
+def update_budget_logic(input_vals, selected, total_trip_limit, single_budget_limit, input_ids, store, all_details):
     store = store or {}
+    total_trip_limit = total_trip_limit if total_trip_limit is not None else 0
+    single_budget_limit = single_budget_limit if single_budget_limit is not None else 0
+    
+    # 1. 處理手動輸入
     if callback_context.triggered:
         trigger_prop = callback_context.triggered[0]["prop_id"]
         if "budget-input" in trigger_prop:
             for val, id_obj in zip(input_vals, input_ids):
                 store[id_obj["index"]] = val if val is not None else 0
 
-    current_total = sum(store.get(pid, 0) for pid in (selected or []))
-    level_price_map = {1: 200, 2: 400, 3: 1000, 4: 2000}
+    # 2. 自動估算新加入的地點預算
+    level_price_map = {1: 200, 2: 600, 3: 1000, 4: 2000}
     if selected and all_details:
         for pid in selected:
             if pid not in store:
-                pl = all_details.get(pid, {}).get("price_level_int", 1)
-                est = level_price_map.get(pl, 200)
-                store[pid] = est
-                current_total += est
-    total_budget = total_budget or 0
-    percent_used = (current_total / total_budget) if total_budget > 0 else 0
-    percent_clamped = max(0, min(percent_used, 1))
-    width_str = f"{percent_clamped * 100:.1f}%" if total_budget > 0 else "0%"
+                pl = all_details.get(pid, {}).get("price_level_int")
+                store[pid] = level_price_map.get(pl, 200) if pl is not None else 200
 
-    over_budget = total_budget > 0 and current_total > total_budget
-    color = "red" if over_budget else "green"
-    msg = f"目前分配預算約 {current_total:.0f}，{'已超出' if color=='red' else '在'} 預算 {total_budget} 範圍內。"
+    # 3. 計算分配總額與檢查「單點超支」
+    current_allocated_total = 0
+    violation_count = 0
+    if selected:
+        for pid in selected:
+            cost = store.get(pid, 0)
+            current_allocated_total += cost
+            if cost > single_budget_limit:
+                violation_count += 1
 
-    progress_bar = html.Div([
+    remaining_budget = total_trip_limit - current_allocated_total
+    
+    # --- 關鍵修正：調整判斷順序 ---
+    # 1. 最優先判斷：總預算是否超支 (顯示紅色)
+    if remaining_budget < 0:
+        color = "#d9534f" # 警告紅
+        status_text = f"⚠️ 已超出總預算 {abs(remaining_budget):.0f} 元"
+        if violation_count > 0:
+            status_text += f" (且有 {violation_count} 處超出單點限制)"
+
+    # 2. 次要判斷：雖然總額沒超，但有單點預算超支 (顯示橘色)
+    elif violation_count > 0:
+        color = "#f0ad4e" # 警告橘
+        status_text = f"🚨 提醒：有 {violation_count} 個地點超過單點預算限制"
+
+    # 3. 判斷：預算剛好花完 (顯示藍色/橘色)
+    elif remaining_budget == 0 and total_trip_limit > 0:
+        color = "#5bc0de" 
+        status_text = "🎯 預算已全數分配完畢"
+
+    # 4. 最後判斷：兩者皆符合，正常剩餘 (顯示綠色)
+    else:
+        color = "#28a745" # 成功綠
+        status_text = f"💰 總預算剩餘 {remaining_budget:.0f} 元"
+
+    # 重新設計提示語 UI
+    msg = html.Div([
         html.Div([
-            html.Div(
-                style={
-                    "width": width_str,
-                    "height": "100%",
-                    "backgroundColor": "#458a4b",
-                    "borderRadius": "999px",
-                    "transition": "width 0.25s ease"
-                }
-            )
-        ], style={
-            "height": "14px",
-            "backgroundColor": "#C0D5BC",
-            "borderRadius": "999px",
-            "overflow": "hidden",
-            "width": "100%",
-        }),
-        html.Span(msg, style={"color": color, "fontWeight": "bold"}),
-    ], style={"display": "flex", "flexDirection": "column", "gap": "6px"})
-
-    return store, progress_bar
+            html.Span(f"目前已規劃支出：{current_allocated_total:.0f} 元", style={"marginRight": "15px"}),
+            html.Span(f"{status_text}", style={"fontWeight": "bold", "fontSize": "18px"})
+        ]),
+    ], style={
+        "color": color, 
+        "padding": "12px", 
+        "backgroundColor": f"{color}11", 
+        "border": f"2px solid {color}",
+        "borderRadius": "8px",
+        "marginTop": "10px",
+        "transition": "all 0.3s"
+    })
+    
+    # 計算進度條寬度
+    progress_width = 0
+    if total_trip_limit > 0:
+        progress_width = min((current_allocated_total / total_trip_limit) * 100, 100)
+    
+    progress_style = {
+        "width": f"{progress_width}%",
+        "height": "100%",
+        "backgroundColor": "#458a4b",
+        "borderRadius": "999px",
+        "transition": "width 0.3s ease"
+    }
+    
+    return store, msg, progress_style
 
 @app.callback(
     Output("selected-itinerary", "children"),
     Input("place-selector", "value"),
-    State("manual-budget-store", "data"),
+    Input("manual-budget-store", "data"),  # 監聽 store，確保介面同步「跳動」
     State("all-place-details", "data"),
 )
 def render_selected(selected, budgets, details):
     if not selected: 
         return html.Div("尚未選擇任何地點", style={"color": "#999", "textAlign": "center", "padding": "40px", "fontWeight": "bold"})
+        return html.Div("尚未選擇任何地點。", style={"color": "#777"})
     items = []
     budgets = budgets or {}
+    details = details or {}
+    
+    # 備援渲染對照表
+    level_price_map = {1: 200, 2: 600, 3: 1000, 4: 2000}
+
     for i, pid in enumerate(selected):
         p = details.get(pid, {})
-        cost = budgets.get(pid, 200)
+        
+        # 決定顯示在 Input 框內的金額
+        if pid in budgets:
+            # 優先使用 Store 裡已算好或改過的值
+            cost = budgets[pid]
+        else:
+            # 沒資料時按等級計算（未知 = 200）
+            pl = p.get("price_level_int")
+            cost = level_price_map.get(pl, 200) if pl is not None else 200
+
         items.append(html.Li([
             html.Div([
                 html.Span(f"{i+1}. {p.get('name')}", style={"fontWeight": "bold"}),
@@ -1307,10 +1395,18 @@ def render_selected(selected, budgets, details):
             ]),
             html.Div([
                 html.Span("預算: "),
-                dcc.Input(id={"type": "budget-input", "index": pid}, type="number", value=cost, debounce=True, style={"width": "80px"}),
+                # 這裡的 value={cost} 會反映 200/600/1000 等自動填入值
+                dcc.Input(
+                    id={"type": "budget-input", "index": pid}, 
+                    type="number", 
+                    value=cost, 
+                    debounce=True, 
+                    style={"width": "80px"}
+                ),
                 html.Button("移除", id={"type": "remove-btn", "index": pid}, style={"marginLeft":"10px", "color":"red", "fontSize":12})
             ], style={"marginTop": "5px"}),
         ], style={"marginBottom": "10px", "borderBottom": "1px solid #eee", "paddingBottom": "5px"}))
+    
     return html.Ol(items, style={"paddingLeft": "0px", "listStyleType": "none"})
 
 @app.callback(
