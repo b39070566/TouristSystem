@@ -386,7 +386,7 @@ if not API_KEY:
 
 # Fallback（僅在你沒有提供環境變數或 .env 時使用；建議移除或替換為空字串）
 if not API_KEY:
-    API_KEY = ""
+    API_KEY = "AIzaSyBU9HJ0M0EspZNoHf40JprQL8tDPZ_UZbU"
 
 PAGE_SIZE = 10
 
@@ -403,6 +403,7 @@ STYLES = {
     "container": {
         "maxWidth": "1200px", "margin": "20px auto",
         "fontFamily": "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", "fontSize": 16,
+        "minHeight": "100vh", "padding": "20px"
     },
     "input_group": {
         "display": "flex", "flexWrap": "wrap", "alignItems": "center", "gap": "6px", "marginBottom": "10px",
@@ -439,7 +440,7 @@ STYLES = {
     "auth_container": {
         "width": "300px", "margin": "100px auto", "padding": "30px",
         "border": "1px solid #ccc", "borderRadius": "10px", "textAlign": "center",
-        "boxShadow": "0 4px 12px rgba(0,0,0,0.1)"
+        "boxShadow": "0 4px 12px rgba(0,0,0,0.1)", "backgroundColor": "#F5F1ED"
     },
     "auth_input": {
         "width": "100%", "padding": "10px", "marginBottom": "15px",
@@ -571,29 +572,33 @@ def fetch_place_details(place_id):
 
 # 1. 登入介面 Layout
 login_layout = html.Div([
-    html.H2("使用者登入", style={"marginBottom": "20px"}),
-    dcc.Input(id="login-user", type="text", placeholder="帳號", style=STYLES["auth_input"]),
-    dcc.Input(id="login-pwd", type="password", placeholder="密碼", style=STYLES["auth_input"]),
-    html.Button("登入", id="login-btn", style={**STYLES["btn_primary"], "width": "100%", "marginBottom": "10px"}),
-    html.Div(id="login-output", style={"color": "red", "marginBottom": "10px"}),
     html.Div([
-        "還沒有帳號？ ",
-        dcc.Link("點此註冊", href="/register", style={"color": "#1976D2", "fontWeight": "bold"})
-    ])
-], style=STYLES["auth_container"])
+        html.H2("使用者登入", style={"marginBottom": "20px"}),
+        dcc.Input(id="login-user", type="text", placeholder="帳號", style=STYLES["auth_input"]),
+        dcc.Input(id="login-pwd", type="password", placeholder="密碼", style=STYLES["auth_input"]),
+        html.Button("登入", id="login-btn", style={**STYLES["btn_primary"], "width": "100%", "marginBottom": "10px"}),
+        html.Div(id="login-output", style={"color": "red", "marginBottom": "10px"}),
+        html.Div([
+            "還沒有帳號？ ",
+            dcc.Link("點此註冊", href="/register", style={"color": "#1976D2", "fontWeight": "bold"})
+        ])
+    ], style=STYLES["auth_container"])
+], style={"minHeight": "100vh", "display": "flex", "alignItems": "center", "justifyContent": "center"})
 
 # 2. 註冊介面 Layout
 register_layout = html.Div([
-    html.H2("新用戶註冊", style={"marginBottom": "20px"}),
-    dcc.Input(id="reg-user", type="text", placeholder="設定帳號", style=STYLES["auth_input"]),
-    dcc.Input(id="reg-pwd", type="password", placeholder="設定密碼", style=STYLES["auth_input"]),
-    html.Button("註冊", id="reg-btn", style={**STYLES["btn_primary"], "width": "100%", "marginBottom": "10px"}),
-    html.Div(id="reg-output", style={"color": "red", "marginBottom": "10px"}),
     html.Div([
-        "已有帳號？ ",
-        dcc.Link("返回登入", href="/login", style={"color": "#1976D2", "fontWeight": "bold"})
-    ])
-], style=STYLES["auth_container"])
+        html.H2("新用戶註冊", style={"marginBottom": "20px"}),
+        dcc.Input(id="reg-user", type="text", placeholder="設定帳號", style=STYLES["auth_input"]),
+        dcc.Input(id="reg-pwd", type="password", placeholder="設定密碼", style=STYLES["auth_input"]),
+        html.Button("註冊", id="reg-btn", style={**STYLES["btn_primary"], "width": "100%", "marginBottom": "10px"}),
+        html.Div(id="reg-output", style={"color": "red", "marginBottom": "10px"}),
+        html.Div([
+            "已有帳號？ ",
+            dcc.Link("返回登入", href="/login", style={"color": "#1976D2", "fontWeight": "bold"})
+        ])
+    ], style=STYLES["auth_container"])
+], style={"minHeight": "100vh", "display": "flex", "alignItems": "center", "justifyContent": "center"})
 
 # 3. 主程式 Layout
 def get_app_layout(username):
@@ -776,21 +781,21 @@ def display_page(pathname):
                         html.Div(h.get('created_at', ''), style={"color": "#777", "fontSize": 12, "marginBottom": "6px"}),
                         html.Div(', '.join(names), style={"color": "#555", "fontSize": 13, "marginBottom": "8px", "overflow": "hidden", "textOverflow": "ellipsis"}),
                         html.Div([
-                            html.Button("查看", id={"type": "view-history", "index": h.get('id')}, n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px"}),
-                            html.Button("載入", id={"type": "load-history", "index": h.get('id')}, n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px", "backgroundColor": "#1890ff", "color": "#fff", "border": "none"}),
-                            html.Button("刪除", id={"type": "delete-history", "index": h.get('id')}, n_clicks=0, style={"backgroundColor": "#ff4d4f", "color": "#fff", "border": "none", "padding": "6px 8px"}),
+                            html.Button("查看", id={"type": "view-history", "index": h.get('id')}, n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px", "backgroundColor": "#56602d", "color": "white", "border": "none", "borderRadius": "6px", "cursor": "pointer"}),
+                            html.Button("載入", id={"type": "load-history", "index": h.get('id')}, n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px", "backgroundColor": "#F5F1ED", "color": "#705134", "border": "1px solid #705134", "borderRadius": "6px", "cursor": "pointer"}),
+                            html.Button("刪除", id={"type": "delete-history", "index": h.get('id')}, n_clicks=0, style={"backgroundColor": "#F5F1ED", "color": "#705134", "border": "1px solid #705134", "padding": "6px 8px", "borderRadius": "6px", "cursor": "pointer"}),
                         ])
                     ]
 
-                    cards.append(html.Div(card_children, style={"width": "23%", "border": "1px solid #eee", "borderRadius": "6px", "padding": "10px", "boxSizing": "border-box", "marginBottom": "12px"}))
+                    cards.append(html.Div(card_children, style={"width": "23%", "backgroundColor": "#f5f1ed", "border": "1px solid #eee", "borderRadius": "6px", "padding": "10px", "boxSizing": "border-box", "marginBottom": "12px", "boxShadow": "0 4px 12px rgba(0,0,0,0.08)"}))
 
                 grid = html.Div(cards, style={"display": "flex", "flexWrap": "wrap", "gap": "1%"})
 
                 return html.Div([
                     html.Div([
                         html.Div([
-                            dcc.Link(html.Button("回到主頁", style={"padding": "6px 10px", "marginRight": "8px"}), href='/'),
-                            html.Button("新增新的行程", id='new-itinerary-btn', n_clicks=0, style={"padding": "6px 10px"}),
+                            dcc.Link(html.Button("回到主頁", style={"padding": "6px 10px", "marginRight": "8px", "backgroundColor": "#56602d", "color": "white", "border": "none", "borderRadius": "6px", "cursor": "pointer"}), href='/'),
+                            html.Button("新增新的行程", id='new-itinerary-btn', n_clicks=0, style={"padding": "6px 10px", "backgroundColor": "#56602d", "color": "white", "border": "none", "borderRadius": "6px", "cursor": "pointer"}),
                         ], style={"textAlign": "right"})
                     ], style={"marginBottom": "10px"}),
                     html.H2("我的歷史行程", style={"marginBottom": "12px"}),

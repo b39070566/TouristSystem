@@ -1,6 +1,11 @@
 /* Global page background for the whole app */
 html, body {
   background-color: #e1d4c0 !important;
+  background-image: url('/assets/unname.png') !important;
+  background-repeat: no-repeat !important;
+  background-size: 100% auto !important;
+  background-position: top center !important;
+  background-attachment: fixed !important;
   height: 100%;
   margin: 0;
 }
