@@ -1205,7 +1205,7 @@ def render_page(all_options, page, selected_values, all_details):
                 f" ｜ 距離：{p.get('distance_km', 0):.2f} km"
             ], style={"color": "#777", "fontSize": 13}),
             
-            html.Button("查看詳情", id={"type": "detail-btn", "index": pid}, style={"marginTop": "4px", "fontSize": 13, "padding": "2px 8px"})
+            html.Button("查看詳情", id={"type": "detail-btn", "index": pid}, style={"marginTop": "4px", "fontSize": 13, "padding": "4px 12px", "backgroundColor": "#56602D", "color": "white", "border": "none", "borderRadius": "999px", "cursor": "pointer"})
         ], style={"width": "calc(100% - 130px)"})
     ], style={"display": "flex", "alignItems": "center", "marginBottom": "10px", "borderBottom": "1px solid #eee", "paddingBottom": "10px"}))
     max_page = max((len(all_options) - 1) // PAGE_SIZE + 1, 1)
@@ -1312,7 +1312,7 @@ def update_budget_logic(input_vals, selected, total_trip_limit, single_budget_li
 
     # 2. 次要判斷：雖然總額沒超，但有單點預算超支 (顯示橘色)
     elif violation_count > 0:
-        color = "#f0ad4e" # 警告橘
+        color = "#f20418" # 警告橘
         status_text = f"🚨 提醒：有 {violation_count} 個地點超過單點預算限制"
 
     # 3. 判斷：預算剛好花完 (顯示藍色/橘色)
@@ -1389,8 +1389,8 @@ def render_selected(selected, budgets, details):
             html.Div([
                 html.Span(f"{i+1}. {p.get('name')}", style={"fontWeight": "bold"}),
                 html.Div([
-                    html.Button("↑", id={"type": "move-up", "index": pid}, style={"padding": "0 5px"}),
-                    html.Button("↓", id={"type": "move-down", "index": pid}, style={"padding": "0 5px"}),
+                    html.Button("↑", id={"type": "move-up", "index": pid}, style={"padding": "4px 10px", "backgroundColor": "#56602D", "color": "white", "border": "none", "borderRadius": "999px", "cursor": "pointer", "marginLeft": "5px"}),
+                    html.Button("↓", id={"type": "move-down", "index": pid}, style={"padding": "4px 10px", "backgroundColor": "#56602D", "color": "white", "border": "none", "borderRadius": "999px", "cursor": "pointer", "marginLeft": "5px"}),
                 ], style={"float": "right"})
             ]),
             html.Div([
@@ -1403,7 +1403,7 @@ def render_selected(selected, budgets, details):
                     debounce=True, 
                     style={"width": "80px"}
                 ),
-                html.Button("移除", id={"type": "remove-btn", "index": pid}, style={"marginLeft":"10px", "color":"red", "fontSize":12})
+                html.Button("移除", id={"type": "remove-btn", "index": pid}, style={"marginLeft":"10px", "fontSize":12, "padding": "4px 12px", "backgroundColor": "#56602D", "color": "white", "border": "none", "borderRadius": "999px", "cursor": "pointer"})
             ], style={"marginTop": "5px"}),
         ], style={"marginBottom": "10px", "borderBottom": "1px solid #eee", "paddingBottom": "5px"}))
     
