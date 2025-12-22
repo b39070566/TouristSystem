@@ -43,8 +43,15 @@ login_manager.login_view = '/login'
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 # 修改 DB_NAME 的定義（約第 35 行）
 # 請將這裡改成你電腦上的絕對路徑，且確保資料夾已手動建立
-
-DB_NAME = r"C:\Users\userz\Documents\GitHub\Midterm\users.db"
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+DB_NAME = r"D:\data\Documents\GitHub\midterm_new\Midterm\users.db"
+=======
+DB_NAME = r"d:\Users\master_file\PythonCode_Basic\Midterm-main\users.db"
+>>>>>>> Stashed changes
+=======
+DB_NAME = r"d:\Users\master_file\PythonCode_Basic\Midterm-main\users.db"
+>>>>>>> Stashed changes
 
 # 建議在這裡加一行 print，啟動時你就能在終端機看到正確路徑
 print(f"✅ 資料庫絕對路徑設定為: {DB_NAME}")
@@ -357,7 +364,16 @@ if not API_KEY:
         pass
 
 # Fallback（僅在你沒有提供環境變數或 .env 時使用；建議移除或替換為空字串）
-API_KEY = "AIzaSyBU9HJ0M0EspZNoHf40JprQL8tDPZ_UZbU"
+if not API_KEY:
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+    API_KEY = ""
+=======
+    API_KEY = "YOUR_GOOGLE_MAPS_API_KEY_HERE"
+>>>>>>> Stashed changes
+=======
+    API_KEY = "YOUR_GOOGLE_MAPS_API_KEY_HERE"
+>>>>>>> Stashed changes
 
 PAGE_SIZE = 10
 
