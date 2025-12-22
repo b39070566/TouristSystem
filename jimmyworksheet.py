@@ -40,6 +40,7 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 # 修改 DB_NAME 的定義（約第 35 行）
 # 請將這裡改成你電腦上的絕對路徑，且確保資料夾已手動建立
+<<<<<<< Updated upstream
 
 
 DB_NAME = r"D:\data\Documents\GitHub\midterm_new\Midterm\users.db"
@@ -72,6 +73,12 @@ if DB_NAME is None:
             print(f"⚠️ 無法建立目錄 {db_dir}，改用本地目錄")
             DB_NAME = DB_PATHS[-1]  # 使用本地目錄作為最終備援
     print(f"✅ 將建立新資料庫: {DB_NAME}")
+=======
+DB_NAME = r"d:\Users\master_file\PythonCode_Basic\Midterm-main\users.db"
+
+# 建議在這裡加一行 print，啟動時你就能在終端機看到正確路徑
+print(f"✅ 資料庫絕對路徑設定為: {DB_NAME}")
+>>>>>>> Stashed changes
 
 # 1. 移除 DB_LOCK，保留最基礎的連線與初始化
 def db_connect():
@@ -382,9 +389,13 @@ if not API_KEY:
 # Fallback（僅在你沒有提供環境變數或 .env 時使用；建議移除或替換為空字串）
 
 if not API_KEY:
+<<<<<<< Updated upstream
     API_KEY = ""
 
 
+=======
+    API_KEY = "YOUR_GOOGLE_MAPS_API_KEY_HERE"
+>>>>>>> Stashed changes
 
 PAGE_SIZE = 10
 
@@ -688,7 +699,11 @@ def get_app_layout(username):
                         ], style={"marginTop": "10px", "display": "flex", "justifyContent": "center", "alignItems": "center"}),
                     ], style={**STYLES["panel_round"], "flex": "1", "marginRight": "20px"}),
 
+<<<<<<< Updated upstream
                     # 右側：已選行程 (包含使用說明按鈕與彈窗)
+=======
+            html.Div([
+>>>>>>> Stashed changes
                     html.Div([
                         html.Div([
                             html.Div([
@@ -750,8 +765,12 @@ def get_app_layout(username):
                 ], style={"display": "flex", "flexDirection": "row", "marginBottom": "20px"}),
             ], style={"display": "flex", "flexDirection": "column"}),
 
+<<<<<<< Updated upstream
             # 下方圖表區
             html.Div([
+=======
+                 html.Div([
+>>>>>>> Stashed changes
                 html.Div([
                     html.H3("預算分析", style={"marginBottom": "10px"}),
                     dcc.Graph(id="budget-pie-chart", style={"width": "100%", "height": "300px"}, config={"displayModeBar": False}),
@@ -826,6 +845,7 @@ def display_page(pathname):
                         html.Div(h.get('title', ''), style={"fontWeight": "bold", "marginBottom": "6px"}),
                         html.Div(h.get('created_at', ''), style={"color": "#777", "fontSize": 12, "marginBottom": "6px"}),
                         html.Div(', '.join(names), style={"color": "#555", "fontSize": 13, "marginBottom": "8px", "overflow": "hidden", "textOverflow": "ellipsis"}),
+<<<<<<< Updated upstream
                         html.Div([html.Button("查看",id={"type": "view-history", "index": h.get('id')},n_clicks=0,style={"padding": "6px 10px","borderRadius": "8px","border": "1px solid #3F5D3A","backgroundColor": "transparent","color": "#3F5D3A","cursor": "pointer"}),
                                   html.Button("載入",id={"type": "load-history", "index": h.get('id')},n_clicks=0,style={"padding": "6px 10px","borderRadius": "8px","backgroundColor": "#3F5D3A","color": "#FFFFFF","border": "none","cursor": "pointer"}),
                                   html.Button("刪除",id={"type": "delete-history", "index": h.get('id')},n_clicks=0,style={"padding": "6px 10px","borderRadius": "8px","backgroundColor": "#8B2C2C","color": "#FFFFFF","border": "none","cursor": "pointer"}),
@@ -835,14 +855,30 @@ def display_page(pathname):
                                ]
 
                     cards.append(html.Div(card_children, style={"width": "23%", "border": "2px solid #FFFFFF", "borderRadius": "10px", "padding": "14px", "boxSizing": "border-box", "marginBottom": "12px", "backgroundColor": "rgba(255, 255, 255, 0.85)", "boxShadow": "0 4px 12px rgba(0,0,0,0.1)"}))
+=======
+                        html.Div([
+                            html.Button("查看", id={"type": "view-history", "index": h.get('id')}, n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px"}),
+                            html.Button("載入", id={"type": "load-history", "index": h.get('id')}, n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px", "backgroundColor": "#1890ff", "color": "#fff", "border": "none"}),
+                            html.Button("刪除", id={"type": "delete-history", "index": h.get('id')}, n_clicks=0, style={"backgroundColor": "#ff4d4f", "color": "#fff", "border": "none", "padding": "6px 8px"}),
+                            html.Button("改名", id={"type": "rename-history", "index": h.get('id')},n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px"})
+                        ])
+                    ]
+
+                    cards.append(html.Div(card_children, style={"width": "23%", "border": "1px solid #eee", "borderRadius": "6px", "padding": "10px", "boxSizing": "border-box", "marginBottom": "12px"}))
+>>>>>>> Stashed changes
 
                 grid = html.Div(cards, style={"display": "flex", "flexWrap": "wrap", "gap": "1%"})
 
                 return html.Div([
                     html.Div([
                         html.Div([
+<<<<<<< Updated upstream
                             dcc.Link(html.Button("回到主頁", style={"padding": "8px 16px", "borderRadius": "8px", "backgroundColor": "#3F5D3A", "color": "#FFFFFF", "border": "none", "cursor": "pointer", "marginRight": "10px", "fontSize": "14px", "fontWeight": "500"}), href='/'),
                             html.Button("新增新的行程", id='new-itinerary-btn', n_clicks=0, style={"padding": "8px 16px", "borderRadius": "8px", "backgroundColor": "#3F5D3A", "color": "#FFFFFF", "border": "none", "cursor": "pointer", "fontSize": "14px", "fontWeight": "500"}),
+=======
+                            dcc.Link(html.Button("回到主頁", style={"padding": "6px 10px", "marginRight": "8px"}), href='/'),
+                            html.Button("新增新的行程", id='new-itinerary-btn', n_clicks=0, style={"padding": "6px 10px"}),
+>>>>>>> Stashed changes
                         ], style={"textAlign": "right"})
                     ], style={"marginBottom": "10px"}),
                      html.Div(
@@ -991,7 +1027,7 @@ def search_and_build_options(submit_addr, submit_budget, n_clicks, address, budg
 
     # 以評論數排序作為「熱門程度」（若 nearby 未提供則會嘗試用 details API 取得）
     nearby_scored = calculate_popularity_score(nearby, apikey=API_KEY)
-    max_pl = 1 if budget <= 200 else 2 if budget <= 600 else 3 if budget <= 1000 else 4
+    max_pl = 1 if budget <= 200 else 2 if budget <= 400 else 3 if budget <= 1400 else 4
 
     new_details = old_details.copy() if old_details else {}
     options = []
@@ -1314,7 +1350,10 @@ def render_page(all_options, page, selected_values, all_details):
         
         photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=180&photo_reference={p.get('photo_reference')}&key={API_KEY}" if p.get("photo_reference") else None
 
+<<<<<<< Updated upstream
 # --- 完整替換開始 ---
+=======
+>>>>>>> Stashed changes
         cards.append(html.Div([
             dcc.Checklist(
                 options=[{"label": "", "value": pid}],
@@ -1342,6 +1381,7 @@ def render_page(all_options, page, selected_values, all_details):
                 # 第三、四行：地址與評分資訊
                 html.Div(f"地址：{p.get('vicinity', '無')}", style={"color": "#555", "fontSize": 14}),
                 html.Div(f"評分：{p.get('rating', '無')} ｜ 距離：{p.get('distance_km', 0):.2f} km", style={"color": "#777", "fontSize": 13}),
+<<<<<<< Updated upstream
                 
                 # 查看詳情按鈕：整合後的正確版本
                 html.Button(
@@ -1364,6 +1404,11 @@ def render_page(all_options, page, selected_values, all_details):
             "paddingBottom": "10px"
         }))
         # --- 替換結束 ---
+=======
+                html.Button("查看詳情", id={"type": "detail-btn", "index": pid}, style={"marginTop": "4px", "fontSize": 13, "padding": "2px 8px"})
+            ], style={"width": "calc(100% - 130px)"})
+        ], style={"display": "flex", "alignItems": "center", "marginBottom": "10px", "borderBottom": "1px solid #eee", "paddingBottom": "10px"}))
+>>>>>>> Stashed changes
 
     max_page = max((len(all_options) - 1) // PAGE_SIZE + 1, 1)
     return cards, f"第 {page + 1} / {max_page} 頁"
@@ -1656,6 +1701,7 @@ def render_modal_content(state, cache):
         html.P([html.Strong("地址: "), res.get("formatted_address")]),
         html.P([html.Strong("電話: "), res.get("formatted_phone_number", "無")]),
         html.P([html.Strong("狀態: "), html.Span(status_text, style={"color": "green" if open_now else "red"})]),
+<<<<<<< Updated upstream
         
         # --- 在這裡新增網址 ---
         html.P([
@@ -1664,6 +1710,8 @@ def render_modal_content(state, cache):
         ]),
         # --------------------
 
+=======
+>>>>>>> Stashed changes
         html.Hr(),
         html.H4("最新評論"),
         html.Div([
