@@ -407,7 +407,7 @@ STYLES = {
     },
     "input_group": {
         "display": "flex", "flexWrap": "wrap", "alignItems": "center", "gap": "6px", "marginBottom": "10px",
-        "backgroundColor": "#F5F1ED", "borderRadius": "999px", "padding": "12px 16px", "border": "1px solid #E8DDD4",
+        "backgroundColor": "#F0EBE0", "borderRadius": "999px", "padding": "12px 16px", "border": "1px solid #E8DDD4",
         "boxShadow": "0 4px 12px rgba(0,0,0,0.08)", "width": "fit-content"
     },
     "input_text": {"fontSize": 16, "width": "320px", "padding": "6px 8px", "borderRadius": "999px", "border": "1px solid #ddd"},
@@ -625,57 +625,58 @@ def get_app_layout(username):
                 html.Div([
                     html.H1("附近行程智慧推薦", className="section-title", style={"marginBottom": "5px"}),
                     html.P("輸入出發地與預算，系統將為您推薦最佳行程。", style={"marginTop": "0px", "color": "#555"}),
-                ], style={"textAlign": "left", "marginBottom": "20px"}),
-
-                html.Div([
                     html.Div([
-                        dcc.Input(
-                            id="address", type="text", placeholder="輸入出發地址，例如：台北車站", style=STYLES["input_text"]
+                        html.Div([
+                            dcc.Input(
+                                id="address", type="text", placeholder="輸入出發地址，例如：台北車站", style=STYLES["input_text"]
+                            ),
+                            html.Span("*", style={"color": "red", "fontWeight": "bold", "marginLeft": "4px", "fontSize": "16px"}),
+                        ], style={"display": "flex", "alignItems": "center", "gap": "2px"}),
+                        html.Div([
+                            dcc.Input(
+                                id="budget", type="number", placeholder="單點預算限制", value=None, style={"width": "120px", "padding": "6px", "borderRadius": "999px", "border": "1px solid #ddd"}
+                            ),
+                            html.Span("*", style={"color": "red", "fontWeight": "bold", "marginLeft": "4px", "fontSize": "16px"}),
+                        ], style={"display": "flex", "alignItems": "center", "gap": "2px"}),
+                        html.Div([
+                            dcc.Input(
+                                id="total-trip-budget", type="number", placeholder="預算上限 (TWD)", value=1000, style=STYLES["input_budget"]
+                            ),
+                            html.Span("*", style={"color": "red", "fontWeight": "bold", "marginLeft": "4px", "fontSize": "16px"}),
+                        ], style={"display": "flex", "alignItems": "center", "gap": "2px"}),
+                        dcc.Dropdown(
+                            id="category",
+                            options=[{"label": "美食", "value": "food"}, {"label": "娛樂", "value": "fun"}],
+                            value=["food", "fun"],
+                            multi=True, clearable=False,
+                            style={"width": "260px", "verticalAlign": "middle"}
                         ),
-                        html.Span("*", style={"color": "red", "fontWeight": "bold", "marginLeft": "4px", "fontSize": "16px"}),
-                    ], style={"display": "flex", "alignItems": "center", "gap": "2px"}),
-                    html.Div([
-                        dcc.Input(
-                            id="budget", type="number", placeholder="單點預算限制", value=None, style={"width": "120px", "padding": "6px", "borderRadius": "999px", "border": "1px solid #ddd"}
-                        ),
-                        html.Span("*", style={"color": "red", "fontWeight": "bold", "marginLeft": "4px", "fontSize": "16px"}),
-                    ], style={"display": "flex", "alignItems": "center", "gap": "2px"}),
-                    html.Div([
-                        dcc.Input(
-                            id="total-trip-budget", type="number", placeholder="預算上限 (TWD)", value=1000, style=STYLES["input_budget"]
-                        ),
-                        html.Span("*", style={"color": "red", "fontWeight": "bold", "marginLeft": "4px", "fontSize": "16px"}),
-                    ], style={"display": "flex", "alignItems": "center", "gap": "2px"}),
-                    dcc.Dropdown(
-                        id="category",
-                        options=[{"label": "美食", "value": "food"}, {"label": "娛樂", "value": "fun"}],
-                        value=["food", "fun"],
-                        multi=True, clearable=False,
-                        style={"width": "260px", "verticalAlign": "middle"}
-                    ),
-                    html.Button("查詢", id="search-btn", n_clicks=0, style=STYLES["btn_primary"]),
-                ], style=STYLES["input_group"]),
+                        html.Button("查詢", id="search-btn", n_clicks=0, style=STYLES["btn_primary"]),
+                    ], style=STYLES["input_group"]),
 
-                html.Div(id="budget-warning", style={"marginTop": "5px", "marginBottom": "15px", "fontSize": 16}),
+                    html.Div(id="budget-warning", style={"marginTop": "5px", "marginBottom": "15px", "fontSize": 16}),
 
-                # 進度條：顯示預算使用情況
-                html.Div([
-                    html.Div(id="budget-progress-bar", style={
-                        "width": "0%",
-                        "height": "100%",
-                        "backgroundColor": "#458a4b",
+                    # 進度條：顯示預算使用情況
+                    html.Div([
+                        html.Div(id="budget-progress-bar", style={
+                            "width": "0%",
+                            "height": "100%",
+                            "backgroundColor": "#458a4b",
+                            "borderRadius": "999px",
+                            "transition": "width 0.3s ease"
+                        })
+                    ], style={
+                        "width": "100%",
+                        "height": "14px",
+                        "backgroundColor": "#c0d5bc",
                         "borderRadius": "999px",
-                        "transition": "width 0.3s ease"
-                    })
-                ], style={
-                    "width": "100%",
-                    "height": "14px",
-                    "backgroundColor": "#c0d5bc",
-                    "borderRadius": "999px",
-                    "overflow": "hidden",
-                    "marginBottom": "15px"
-                }),
+                        "overflow": "hidden",
+                        "marginBottom": "15px"
+                    }),
+                ], style={"backgroundColor": "rgba(255,255,255,0.85)", "padding": "16px", "borderRadius": "12px", "boxShadow": "0 6px 16px rgba(0,0,0,0.12)", "marginBottom": "20px"}),
+            ], style={"display": "flex", "flexDirection": "column"}),
 
+            html.Div([
                 html.Div([
                     html.Div([
                         html.H3("推薦地點", style={"marginBottom": "10px"}),
@@ -798,7 +799,10 @@ def display_page(pathname):
                             html.Button("新增新的行程", id='new-itinerary-btn', n_clicks=0, style={"padding": "6px 10px", "backgroundColor": "#56602d", "color": "white", "border": "none", "borderRadius": "6px", "cursor": "pointer"}),
                         ], style={"textAlign": "right"})
                     ], style={"marginBottom": "10px"}),
-                    html.H2("我的歷史行程", style={"marginBottom": "12px"}),
+                    html.Div(
+                        html.H2("我的歷史行程", style={"margin": "0"}),
+                        style={"marginBottom": "12px", "backgroundColor": "rgba(255,255,255,0.85)", "padding": "12px 16px", "borderRadius": "10px", "boxShadow": "0 6px 16px rgba(0,0,0,0.12)"}
+                    ),
                     grid,
                     # 詳細 modal（會由 callback 控制顯示/內容）
                     html.Div(id='history-detail-backdrop', style={**STYLES.get("modal_overlay", {}), "display": "none"}),
