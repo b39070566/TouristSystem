@@ -1,4 +1,3 @@
-import os
 import dash
 from dash import dcc, html, Output, Input, State, no_update, callback_context
 from dash.dependencies import ALL
@@ -6,16 +5,17 @@ import requests
 import json
 import math
 import sqlite3
+import os
 from datetime import datetime
 import ast
 import threading
 from dotenv import load_dotenv
 
+
 from flask import Flask, redirect
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-
-# ...existing code...
+from dash.exceptions import PreventUpdate
 
 # ----------------------------------------------------
 # 🔐 設定與資料庫初始化 (SQLite & Flask-Login)
@@ -43,304 +43,241 @@ login_manager.login_view = '/login'
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 # 修改 DB_NAME 的定義（約第 35 行）
 # 請將這裡改成你電腦上的絕對路徑，且確保資料夾已手動建立
+<<<<<<< Updated upstream
 DB_NAME = r"D:\data\Documents\GitHub\midterm_new\Midterm\users.db"
+=======
+DB_NAME = r"d:\Users\master_file\PythonCode_Basic\Midterm-main\users.db"
+>>>>>>> Stashed changes
 
 # 建議在這裡加一行 print，啟動時你就能在終端機看到正確路徑
 print(f"✅ 資料庫絕對路徑設定為: {DB_NAME}")
 
-# 全域 DB 鎖，確保跨 thread 的存取一致性
-DB_LOCK = threading.Lock()
-
-
+# 1. 移除 DB_LOCK，保留最基礎的連線與初始化
 def db_connect():
-    """回傳可跨 thread 使用的 sqlite3 連線（設為 check_same_thread=False）。
-    使用完成後請務必 close()。
-    """
-    return sqlite3.connect(DB_NAME, check_same_thread=False, timeout=30)
+    """回傳最簡單的 sqlite3 連線，不使用任何進階 thread 參數，避免衝突"""
+    return sqlite3.connect(DB_NAME, timeout=20)
 
 def init_db():
-    """初始化資料庫，建立 users 表 + itineraries 表"""
+    """初始化資料庫，強制使用最穩定的模式，確保實體寫入"""
     conn = db_connect()
     c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
-        )
-    ''')
-
-    # ✅ 新增：行程儲存（每個 user_id 一筆）
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS itineraries (
-            user_id INTEGER PRIMARY KEY,
-            selected_json TEXT NOT NULL,
-            budgets_json TEXT NOT NULL,
-            details_json TEXT NOT NULL,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
-    ''')
-
-    # 建立歷史行程表，避免後續 SELECT 在 table 不存在時出錯
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS itinerary_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            title TEXT,
-            selected_json TEXT NOT NULL,
-            budgets_json TEXT,
-            details_json TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
-    ''')
+    # 建立 users 表
+    c.execute('''CREATE TABLE IF NOT EXISTS users 
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL)''')
+    # 建立 itineraries 表 (目前行程)
+    c.execute('''CREATE TABLE IF NOT EXISTS itineraries 
+                 (user_id INTEGER PRIMARY KEY, selected_json TEXT NOT NULL, budgets_json TEXT NOT NULL, details_json TEXT NOT NULL)''')
+    # 建立 itinerary_history 表 (歷史紀錄)
+    c.execute('''CREATE TABLE IF NOT EXISTS itinerary_history 
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, title TEXT, 
+                  selected_json TEXT NOT NULL, budgets_json TEXT, details_json TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)''')
+    
+    # 在 init_db() 中，建立 itinerary_history 表後面加這段
+    c.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_itinerary_history_user_title
+    ON itinerary_history(user_id, title)
+""")
 
     conn.commit()
+    # 強制設定：不使用 WAL 快照，確保每次儲存都是直接寫入硬碟檔
     try:
-        # 修改這裡：從 WAL 改為 DELETE
-        c.execute("PRAGMA journal_mode=DELETE") 
-        c.execute("PRAGMA synchronous=FULL") # 確保實體寫入
-        print(f"[DEBUG] init_db: journal_mode set to {c.fetchone()}")
-    except Exception:
+        c.execute("PRAGMA journal_mode=DELETE")
+        c.execute("PRAGMA synchronous=FULL")
+    except:
         pass
     conn.close()
+    print("✅ 資料庫簡單模式初始化完成")
 
-
-
-# 替換掉原本的 _parse_triggered_id 或新增此函式
-def _get_triggered_index(prop_id_str=None):
-    """使用 Dash 2.4+ 推薦的 triggered_id 方式，精確抓取 Pattern-matching 的 index"""
+# 2. 保留這個解析函式 (這是 UI 點擊必要的工具)
+def _get_triggered_index():
     ctx = callback_context
     if not ctx.triggered:
         return None
-    # 取得觸發元件的 ID 字典
     t_id = ctx.triggered_id
     if isinstance(t_id, dict):
         return t_id.get('index')
     return None
 
+# 3. 簡化後的現有行程儲存/載入 (移除 DB_LOCK 與複雜邏輯)
+# --- 修正後的行程儲存/載入工具 ---
 
-def _parse_triggered_id(prop_id_str):
-    """解析 callback_context 回傳的 prop_id（或傳入的 prop_id 字串），回傳 dict 或 None。
-    prop_id_str 可能是字串形式例如 '{"type":"delete-history","index":123}.n_clicks'
-    或已經是 dict（某些情況下會直接傳入）。"""
-    try:
-        if isinstance(prop_id_str, dict):
-            return prop_id_str
-        # 如果是類似 '... .n_clicks' 的字串，先取前半段再 json.loads
-        base = str(prop_id_str).split('.')[0]
-        return json.loads(base)
-    except Exception:
-        return None
-
-# --- 行程儲存/載入工具 ---
 def save_user_itinerary(user_id, selected, budgets, details_subset):
-    """儲存使用者已選行程（UPSERT）"""
-    selected = selected or []
-    budgets = budgets or {}
-    details_subset = details_subset or {}
-
+    """簡單版儲存：移除 updated_at 欄位，確保與簡化版 init_db 對齊"""
     conn = db_connect()
     c = conn.cursor()
-    with DB_LOCK:
+    try:
         c.execute("""
-        INSERT INTO itineraries (user_id, selected_json, budgets_json, details_json, updated_at)
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(user_id) DO UPDATE SET
-            selected_json = excluded.selected_json,
-            budgets_json = excluded.budgets_json,
-            details_json = excluded.details_json,
-            updated_at = CURRENT_TIMESTAMP
-    """, (
-        int(user_id),
-        json.dumps(selected, ensure_ascii=False),
-        json.dumps(budgets, ensure_ascii=False),
-        json.dumps(details_subset, ensure_ascii=False),
-    ))
+            INSERT INTO itineraries (user_id, selected_json, budgets_json, details_json)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                selected_json = excluded.selected_json,
+                budgets_json = excluded.budgets_json,
+                details_json = excluded.details_json
+        """, (
+            int(user_id),
+            json.dumps(selected or [], ensure_ascii=False),
+            json.dumps(budgets or {}, ensure_ascii=False),
+            json.dumps(details_subset or {}, ensure_ascii=False),
+        ))
         conn.commit()
-    conn.close()
+    finally:
+        conn.close()
 
 def load_user_itinerary(user_id):
-    """讀取使用者已選行程；沒有就回空"""
-    if not user_id:
-        return {"selected": [], "budgets": {}, "details": {}}
-
+    """簡單版讀取：直接回傳結果"""
+    if not user_id: return {"selected": [], "budgets": {}, "details": {}}
     conn = db_connect()
     c = conn.cursor()
-    with DB_LOCK:
-        c.execute("SELECT selected_json, budgets_json, details_json FROM itineraries WHERE user_id = ?", (int(user_id),))
-        row = c.fetchone()
+    c.execute("SELECT selected_json, budgets_json, details_json FROM itineraries WHERE user_id = ?", (int(user_id),))
+    row = c.fetchone()
     conn.close()
-
-    if not row:
+    if not row: return {"selected": [], "budgets": {}, "details": {}}
+    try:
+        return {"selected": json.loads(row[0]), "budgets": json.loads(row[1]), "details": json.loads(row[2])}
+    except:
         return {"selected": [], "budgets": {}, "details": {}}
 
-    try:
-        selected = json.loads(row[0]) if row[0] else []
-        budgets  = json.loads(row[1]) if row[1] else {}
-        details  = json.loads(row[2]) if row[2] else {}
-    except Exception:
-        selected, budgets, details = [], {}, {}
-
-    return {"selected": selected, "budgets": budgets, "details": details}
-
-
-# --- 多筆歷史行程表（每個使用者可儲存多筆） -----------------
 def add_history_itinerary(user_id, selected, budgets, details_subset, title=None):
-    selected = selected or []
-    budgets = budgets or {}
-    details_subset = details_subset or {}
-
+    """簡單版歷史儲存：移除所有複雜的 PRAGMA 和重試"""
     conn = db_connect()
     c = conn.cursor()
-    # （表在 init_db 已建立；這裡保留以防 DB 被移除）
-    with DB_LOCK:
-        c.execute('''
-        CREATE TABLE IF NOT EXISTS itinerary_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            title TEXT,
-            selected_json TEXT NOT NULL,
-            budgets_json TEXT,
-            details_json TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    c.execute(
+        "INSERT INTO itinerary_history (user_id, title, selected_json, budgets_json, details_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            int(user_id),
+            title or f"儲存於 {now_str}",
+            json.dumps(selected or [], ensure_ascii=False),
+            json.dumps(budgets or {}, ensure_ascii=False),
+            json.dumps(details_subset or {}, ensure_ascii=False),
+            now_str
         )
-    ''')
-    try:
-        with DB_LOCK:
-            c.execute(
-                "INSERT INTO itinerary_history (user_id, title, selected_json, budgets_json, details_json) VALUES (?, ?, ?, ?, ?)",
-                (
-                    int(user_id),
-                    title or f"儲存於 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                    json.dumps(selected, ensure_ascii=False),
-                    json.dumps(budgets, ensure_ascii=False),
-                    json.dumps(details_subset, ensure_ascii=False),
-                )
-            )
-            inserted = c.lastrowid
-            conn.commit()
-            print(f"[DEBUG] add_history_itinerary: DB={DB_NAME} inserted id={inserted} for user={user_id}, selected_count={len(selected)}")
-            # 立即讀取確認（debug helper）
-            try:
-                c.execute("SELECT COUNT(*) FROM itinerary_history")
-                cnt = c.fetchone()
-                c.execute("SELECT id, user_id, title, created_at FROM itinerary_history ORDER BY id DESC LIMIT 5")
-                recent = c.fetchall()
-                try:
-                    c.execute("PRAGMA database_list")
-                    dbl = c.fetchall()
-                except Exception:
-                    dbl = None
-                # 強制 checkpoint 一次，讓其他連線能更快看到變更
-                try:
-                    c.execute("PRAGMA wal_checkpoint(FULL)")
-                    cp = c.fetchone()
-                except Exception:
-                    cp = None
-                print(f"[DEBUG] add_history_itinerary: post-insert count={cnt}, recent={recent}, database_list={dbl}, checkpoint={cp}, in_transaction={conn.in_transaction}, pid={os.getpid()}, thread={threading.get_ident()}")
-            except Exception as e:
-                print(f"[ERROR] add_history_itinerary: post-insert verification failed: {e}")
-    except Exception as e:
-        print(f"[ERROR] add_history_itinerary failed: {e}")
-    finally:
-        conn.close()
-
+    )
+    conn.commit()
+    conn.close()
+    print(f"✅ 行程已成功儲存至歷史紀錄")
 
 def load_user_itineraries(user_id):
-    """回傳該使用者所有歷史行程（由新到舊）"""
-    if not user_id:
-        print(f"[DEBUG] load_user_itineraries called with falsy user_id: {user_id!r}")
-        return []
+    """簡單版歷史列表：一次性讀取"""
+    if not user_id: return []
     conn = db_connect()
     c = conn.cursor()
-    try:
-        c.execute("PRAGMA database_list")
-        dbl = c.fetchall()
-    except Exception:
-        dbl = None
-    print(f"[DEBUG] load_user_itineraries: connecting to DB={DB_NAME}, database_list={dbl}, conn_in_transaction={conn.in_transaction}, pid={os.getpid()}, thread={threading.get_ident()}")
-    try:
-        with DB_LOCK:
-            c.execute("SELECT id, title, selected_json, budgets_json, details_json, created_at FROM itinerary_history WHERE user_id = ? ORDER BY created_at DESC", (int(user_id),))
-            rows = c.fetchall()
-        print(f"[DEBUG] load_user_itineraries: DB={DB_NAME} fetched_rows={len(rows)} for user={user_id!r} (type={type(user_id)}), pid={os.getpid()}, thread={threading.get_ident()}, total_changes={conn.total_changes}")
-        if rows:
-            print(f"[DEBUG] sample_row_ids: {[r[0] for r in rows[:5]]}")
-        else:
-            # 若查無，印出最近幾筆以供比對（不會回傳給呼叫端）
-            try:
-                with DB_LOCK:
-                    c.execute("SELECT id, user_id, title, created_at FROM itinerary_history ORDER BY id DESC LIMIT 10")
-                    recent = c.fetchall()
-                print(f"[DEBUG] load_user_itineraries: recent rows (any user): {recent}")
-            except Exception as e:
-                print(f"[ERROR] load_user_itineraries: failed to fetch recent rows: {e}")
-    except Exception as e:
-        print(f"[ERROR] load_user_itineraries: query failed: {e}")
-        rows = []
-    finally:
-        conn.close()
+    c.execute("SELECT id, title, selected_json, budgets_json, details_json, created_at FROM itinerary_history WHERE user_id = ? ORDER BY created_at DESC", (int(user_id),))
+    rows = c.fetchall()
+    conn.close()
     out = []
     for r in rows:
         try:
-            sel = json.loads(r[2]) if r[2] else []
-            budgets = json.loads(r[3]) if r[3] else {}
-            details = json.loads(r[4]) if r[4] else {}
-        except Exception:
-            sel, budgets, details = [], {}, {}
-        out.append({"id": r[0], "title": r[1], "selected": sel, "budgets": budgets, "details": details, "created_at": r[5]})
+            out.append({
+                "id": r[0], "title": r[1],
+                "selected": json.loads(r[2]),
+                "budgets": json.loads(r[3]),
+                "details": json.loads(r[4]),
+                "created_at": r[5]
+            })
+        except: continue
+    return out
+
+# --- 多筆歷史行程表（每個使用者可儲存多筆） -----------------
+def add_history_itinerary(user_id, selected, budgets, details_subset, title=None):
+    """
+    簡單版行程儲存：
+    移除所有 DB_LOCK 與複雜的 PRAGMA Checkpoint 邏輯，
+    確保資料直接寫入實體硬碟。
+    """
+    selected = selected or []
+    budgets = budgets or {}
+    details_subset = details_subset or {}
+
+    conn = db_connect() # 使用我們簡化過的連線函式
+    c = conn.cursor()
+    
+    try:
+        # 直接執行插入動作
+        c.execute(
+            "INSERT INTO itinerary_history (user_id, title, selected_json, budgets_json, details_json) VALUES (?, ?, ?, ?, ?)",
+            (
+                int(user_id),
+                title or f"儲存於 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                json.dumps(selected, ensure_ascii=False),
+                json.dumps(budgets, ensure_ascii=False),
+                json.dumps(details_subset, ensure_ascii=False),
+            )
+        )
+        conn.commit() # 實體提交至硬碟
+        
+        # 簡化後的 Debug 訊息，僅確認是否成功寫入
+        print(f"[DEBUG] add_history_itinerary: 成功寫入 ID 為 {user_id} 的行程")
+        
+    except Exception as e:
+        print(f"[ERROR] add_history_itinerary 儲存失敗: {e}")
+    finally:
+        conn.close() # 務必關閉連線，這會釋放檔案鎖
+
+
+def load_user_itineraries(user_id):
+    """簡單版讀取：直接查詢，不使用鎖"""
+    if not user_id:
+        return []
+    conn = db_connect()
+    c = conn.cursor()
+    out = []
+    try:
+        # 移除原本的 with DB_LOCK:
+        c.execute("SELECT id, title, selected_json, budgets_json, details_json, created_at FROM itinerary_history WHERE user_id = ? ORDER BY created_at DESC", (int(user_id),))
+        rows = c.fetchall()
+        for r in rows:
+            try:
+                out.append({
+                    "id": r[0],
+                    "title": r[1],
+                    "selected": json.loads(r[2]),
+                    "budgets": json.loads(r[3]),
+                    "details": json.loads(r[4]),
+                    "created_at": r[5]
+                })
+            except:
+                continue
+    except Exception as e:
+        print(f"[ERROR] load_user_itineraries 查詢失敗: {e}")
+    finally:
+        conn.close()
     return out
 
 
 def delete_itinerary_history(entry_id, user_id):
+    """簡單版刪除：直接提交變更"""
     conn = db_connect()
     c = conn.cursor()
-    with DB_LOCK:
+    try:
+        # 移除原本的 with DB_LOCK:
         c.execute("DELETE FROM itinerary_history WHERE id = ? AND user_id = ?", (int(entry_id), int(user_id)))
         conn.commit()
-    conn.close()
+    finally:
+        conn.close()
 
 
 def get_history_entry(entry_id, user_id):
-    conn = sqlite3.connect(DB_NAME, timeout=30)
+    """簡單版單筆讀取"""
+    conn = db_connect()
     c = conn.cursor()
     try:
-        # 改成只查 ID，不要管 user_id，看看能不能抓到
-        c.execute("SELECT id, title, selected_json, budgets_json, details_json, created_at FROM itinerary_history WHERE id = ?", (int(entry_id),))
+        # 移除原本的 with DB_LOCK:
+        c.execute("SELECT id, title, selected_json, budgets_json, details_json, created_at FROM itinerary_history WHERE id = ? AND user_id = ?", (int(entry_id), int(user_id)))
         row = c.fetchone()
         if row:
-            print(f"[DEBUG] get_history_entry SUCCESS by ID={entry_id}")
             return {
-                "id": row[0], "title": row[1],
+                "id": row[0],
+                "title": row[1],
                 "selected": json.loads(row[2]),
                 "budgets": json.loads(row[3]),
                 "details": json.loads(row[4]),
                 "created_at": row[5]
             }
-        else:
-            print(f"[CRITICAL ERROR] ID={entry_id} COMPLETELY GONE FROM DB FILE!")
-            return None
     finally:
         conn.close()
+    return None
 
-    # 若查無，嘗試以 id 單獨搜尋並印出比對資訊，協助除錯
-    if not row:
-        try:
-            with DB_LOCK:
-                c.execute("SELECT id, user_id, title, selected_json, budgets_json, details_json, created_at FROM itinerary_history WHERE id = ?", (int(entry_id),))
-                fallback = c.fetchone()
-            print(f"[ERROR] get_history_entry: 找不到資料! ID={entry_id}, User={user_id}")
-            print(f"[DEBUG] get_history_entry: attempted params={params}, fallback_by_id={fallback}")
-        except Exception as e:
-            print(f"[ERROR] get_history_entry: fallback query failed: {e}")
-        finally:
-            conn.close()
-        return None
-
-    conn.close()
     
     # 解析 JSON... (保留原本邏輯)
     try:
@@ -352,6 +289,42 @@ def get_history_entry(entry_id, user_id):
         
     return {"id": row[0], "title": row[1], "selected": sel, "budgets": budgets, "details": details, "created_at": row[5]}
 
+def rename_itinerary_history(entry_id, user_id, new_title: str):
+    """只改歷史紀錄 title；同一 user_id 下不允許同名"""
+    new_title = (new_title or "").strip()
+    if not new_title:
+        return {"ok": False, "msg": "名稱不可為空白"}
+
+    conn = db_connect()
+    c = conn.cursor()
+    try:
+        # 先檢查是否同名（避免觸發 UNIQUE INDEX 的例外，也能給更友善訊息）
+        c.execute("""
+            SELECT 1 FROM itinerary_history
+            WHERE user_id = ? AND title = ? AND id <> ?
+            LIMIT 1
+        """, (int(user_id), new_title, int(entry_id)))
+        if c.fetchone():
+            return {"ok": False, "msg": "同名歷史紀錄已存在，請改用不同名稱"}
+
+        c.execute("""
+            UPDATE itinerary_history
+            SET title = ?
+            WHERE id = ? AND user_id = ?
+        """, (new_title, int(entry_id), int(user_id)))
+        conn.commit()
+
+        if c.rowcount == 0:
+            return {"ok": False, "msg": "找不到該筆紀錄，或無權限修改"}
+        return {"ok": True, "msg": "已更新名稱"}
+    except Exception as e:
+        # 若 DB 層 UNIQUE INDEX 仍被撞到，這裡也會擋
+        return {"ok": False, "msg": f"更新失敗：{e}"}
+    finally:
+        conn.close()
+
+
+
 # --- 使用者模型 (配合 Flask-Login) ---
 class User(UserMixin):
     def __init__(self, id, username):
@@ -359,12 +332,14 @@ class User(UserMixin):
         self.username = username
 
 @login_manager.user_loader
+# --- 修正後的 load_user ---
+@login_manager.user_loader
 def load_user(user_id):
     conn = db_connect()
     c = conn.cursor()
-    with DB_LOCK:
-        c.execute("SELECT id, username FROM users WHERE id = ?", (user_id,))
-        res = c.fetchone()
+    # 移除 with DB_LOCK:
+    c.execute("SELECT id, username FROM users WHERE id = ?", (user_id,))
+    res = c.fetchone()
     conn.close()
     if res:
         return User(id=res[0], username=res[1])
@@ -386,7 +361,11 @@ if not API_KEY:
 
 # Fallback（僅在你沒有提供環境變數或 .env 時使用；建議移除或替換為空字串）
 if not API_KEY:
+<<<<<<< Updated upstream
     API_KEY = ""
+=======
+    API_KEY = "YOUR_GOOGLE_MAPS_API_KEY_HERE"
+>>>>>>> Stashed changes
 
 PAGE_SIZE = 10
 
@@ -403,9 +382,8 @@ STYLES = {
     "container": {
         "maxWidth": "1200px", "margin": "20px auto",
         "fontFamily": "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", "fontSize": 16,
-        "minHeight": "100vh", "padding": "20px"
     },
-    "input_group": {
+     "input_group": {
         "display": "flex", "flexWrap": "wrap", "alignItems": "center", "gap": "6px", "marginBottom": "10px",
         "backgroundColor": "#F0EBE0", "borderRadius": "999px", "padding": "12px 16px", "border": "1px solid #E8DDD4",
         "boxShadow": "0 4px 12px rgba(0,0,0,0.08)", "width": "fit-content"
@@ -425,29 +403,30 @@ STYLES = {
         "borderRadius": "24px", "padding": "16px",
         "boxShadow": "0 8px 24px rgba(0,0,0,0.08)", "minHeight": "75px",
     },
+    # --- 修正後的 Modal 樣式，解決閃現問題 ---
     "modal_overlay": {
         "position": "fixed", "top": 0, "left": 0, "width": "100vw", "height": "100vh",
-        "backgroundColor": "rgba(0,0,0,0.3)", "zIndex": 999, "display": "none"
+        "backgroundColor": "rgba(0,0,0,0.5)", "zIndex": 2000, "display": "none"
     },
     "modal_content": {
         "position": "fixed", "top": "50%", "left": "50%", "transform": "translate(-50%, -50%)",
-        "backgroundColor": "white", "border": "1px solid #ccc", "borderRadius": "6px",
-        "padding": "16px", "boxShadow": "0 2px 8px rgba(0,0,0,0.3)",
-        "zIndex": 1000, "width": "420px", "maxHeight": "70vh", "overflowY": "auto",
+        "backgroundColor": "white", "border": "1px solid #ccc", "borderRadius": "10px",
+        "padding": "25px", "boxShadow": "0 4px 20px rgba(0,0,0,0.3)",
+        "zIndex": 2001, "width": "450px", "maxHeight": "80vh", "overflowY": "auto",
         "display": "none"
     },
-    # 新增登入頁面樣式
+    # --- 補回登入/註冊所需的樣式，解決 KeyError ---
     "auth_container": {
-        "width": "300px", "margin": "100px auto", "padding": "30px",
-        "border": "1px solid #ccc", "borderRadius": "10px", "textAlign": "center",
-        "boxShadow": "0 4px 12px rgba(0,0,0,0.1)", "backgroundColor": "#F5F1ED"
+        "width": "350px", "margin": "100px auto", "padding": "40px",
+        "border": "1px solid #ddd", "borderRadius": "12px", "textAlign": "center",
+        "boxShadow": "0 6px 15px rgba(0,0,0,0.1)", "backgroundColor": "#fff"
     },
     "auth_input": {
-        "width": "100%", "padding": "10px", "marginBottom": "15px",
-        "boxSizing": "border-box", "borderRadius": "5px", "border": "1px solid #ddd"
+        "width": "100%", "padding": "12px", "marginBottom": "20px",
+        "boxSizing": "border-box", "borderRadius": "6px", "border": "1px solid #ccc",
+        "fontSize": "16px"
     }
 }
-
 # ----------------------------------------------------
 # 🛠️ 原本 easier.py 的工具函式
 # ----------------------------------------------------
@@ -558,7 +537,7 @@ def fetch_place_details(place_id):
             "https://maps.googleapis.com/maps/api/place/details/json",
             params={
                 "place_id": place_id, "key": API_KEY, "language": "zh-TW",
-                "fields": "name,rating,formatted_address,formatted_phone_number,website,review,price_level,user_ratings_total,opening_hours,url",
+                "fields": "name,rating,formatted_address,formatted_phone_number,website,review,price_level,user_ratings_total,opening_hours",
             },
         ).json()
         result = resp.get("result", {})
@@ -572,33 +551,29 @@ def fetch_place_details(place_id):
 
 # 1. 登入介面 Layout
 login_layout = html.Div([
+    html.H2("使用者登入", style={"marginBottom": "20px"}),
+    dcc.Input(id="login-user", type="text", placeholder="帳號", style=STYLES["auth_input"]),
+    dcc.Input(id="login-pwd", type="password", placeholder="密碼", style=STYLES["auth_input"]),
+    html.Button("登入", id="login-btn", style={**STYLES["btn_primary"], "width": "100%", "marginBottom": "10px"}),
+    html.Div(id="login-output", style={"color": "red", "marginBottom": "10px"}),
     html.Div([
-        html.H2("使用者登入", style={"marginBottom": "20px"}),
-        dcc.Input(id="login-user", type="text", placeholder="帳號", style=STYLES["auth_input"]),
-        dcc.Input(id="login-pwd", type="password", placeholder="密碼", style=STYLES["auth_input"]),
-        html.Button("登入", id="login-btn", style={**STYLES["btn_primary"], "width": "100%", "marginBottom": "10px"}),
-        html.Div(id="login-output", style={"color": "red", "marginBottom": "10px"}),
-        html.Div([
-            "還沒有帳號？ ",
-            dcc.Link("點此註冊", href="/register", style={"color": "#1976D2", "fontWeight": "bold"})
-        ])
-    ], style=STYLES["auth_container"])
-], style={"minHeight": "100vh", "display": "flex", "alignItems": "center", "justifyContent": "center"})
+        "還沒有帳號？ ",
+        dcc.Link("點此註冊", href="/register", style={"color": "#1976D2", "fontWeight": "bold"})
+    ])
+], style=STYLES["auth_container"])
 
 # 2. 註冊介面 Layout
 register_layout = html.Div([
+    html.H2("新用戶註冊", style={"marginBottom": "20px"}),
+    dcc.Input(id="reg-user", type="text", placeholder="設定帳號", style=STYLES["auth_input"]),
+    dcc.Input(id="reg-pwd", type="password", placeholder="設定密碼", style=STYLES["auth_input"]),
+    html.Button("註冊", id="reg-btn", style={**STYLES["btn_primary"], "width": "100%", "marginBottom": "10px"}),
+    html.Div(id="reg-output", style={"color": "red", "marginBottom": "10px"}),
     html.Div([
-        html.H2("新用戶註冊", style={"marginBottom": "20px"}),
-        dcc.Input(id="reg-user", type="text", placeholder="設定帳號", style=STYLES["auth_input"]),
-        dcc.Input(id="reg-pwd", type="password", placeholder="設定密碼", style=STYLES["auth_input"]),
-        html.Button("註冊", id="reg-btn", style={**STYLES["btn_primary"], "width": "100%", "marginBottom": "10px"}),
-        html.Div(id="reg-output", style={"color": "red", "marginBottom": "10px"}),
-        html.Div([
-            "已有帳號？ ",
-            dcc.Link("返回登入", href="/login", style={"color": "#1976D2", "fontWeight": "bold"})
-        ])
-    ], style=STYLES["auth_container"])
-], style={"minHeight": "100vh", "display": "flex", "alignItems": "center", "justifyContent": "center"})
+        "已有帳號？ ",
+        dcc.Link("返回登入", href="/login", style={"color": "#1976D2", "fontWeight": "bold"})
+    ])
+], style=STYLES["auth_container"])
 
 # 3. 主程式 Layout
 def get_app_layout(username):
@@ -610,8 +585,8 @@ def get_app_layout(username):
 
     return html.Div([
         html.Div([
-            # Header: 顯示使用者與登出按鈕 
-            html.Div([
+        # Header: 顯示使用者與登出按鈕
+         html.Div([
                 html.Span(f"👋 Hi, {username}", style={"fontWeight": "bold", "marginRight": "15px"}),
                 dcc.Link(html.Button("登出", style={"fontSize": "14px", "padding": "4px 10px", "cursor": "pointer", "backgroundColor": "transparent", "border": "1px solid #3d1b05", "color": "#3d1b05"}), href="/logout"),
             ], style={"display": "flex", "alignItems": "center", "gap": "10px", "marginBottom": "10px", "marginLeft": "auto", "width": "fit-content"}),
@@ -654,27 +629,28 @@ def get_app_layout(username):
                         html.Button("查詢", id="search-btn", n_clicks=0, style=STYLES["btn_primary"]),
                     ], style=STYLES["input_group"]),
 
-                    html.Div(id="budget-warning", style={"marginTop": "5px", "marginBottom": "15px", "fontSize": 16}),
 
-                    # 進度條：顯示預算使用情況
-                    html.Div([
-                        html.Div(id="budget-progress-bar", style={
-                            "width": "0%",
-                            "height": "100%",
-                            "backgroundColor": "#458a4b",
-                            "borderRadius": "999px",
-                            "transition": "width 0.3s ease"
-                        })
-                    ], style={
-                        "width": "100%",
-                        "height": "14px",
-                        "backgroundColor": "#c0d5bc",
-                        "borderRadius": "999px",
-                        "overflow": "hidden",
-                        "marginBottom": "15px"
-                    }),
-                ], style={"backgroundColor": "rgba(255,255,255,0.85)", "padding": "16px", "borderRadius": "12px", "boxShadow": "0 6px 16px rgba(0,0,0,0.12)", "marginBottom": "20px"}),
-            ], style={"display": "flex", "flexDirection": "column"}),
+        html.Div(id="budget-warning", style={"marginTop": "5px", "marginBottom": "15px", "fontSize": 16}),
+
+# 進度條：顯示預算使用情況
+            html.Div([
+                html.Div(id="budget-progress-bar", style={
+                    "width": "0%",
+                    "height": "100%",
+                    "backgroundColor": "#458a4b",
+                    "borderRadius": "999px",
+                    "transition": "width 0.3s ease"
+                })
+            ], style={
+               "width": "100%",
+               "height": "14px",
+               "backgroundColor": "#c0d5bc",
+               "borderRadius": "999px",
+               "overflow": "hidden",
+               "marginBottom": "15px"
+            }),
+        ], style={"backgroundColor": "rgba(255,255,255,0.85)", "padding": "16px", "borderRadius": "12px", "boxShadow": "0 6px 16px rgba(0,0,0,0.12)", "marginBottom": "20px"}),
+    ], style={"display": "flex", "flexDirection": "column"}),
 
             html.Div([
                 html.Div([
@@ -692,7 +668,7 @@ def get_app_layout(username):
                     ], style={"marginTop": "10px", "display": "flex", "justifyContent": "center", "alignItems": "center"}),
                 ], style={**STYLES["panel_round"], "flex": "1", "marginRight": "20px"}),
 
-                html.Div([
+            html.Div([
                     html.Div([
                         html.H3("已選行程", style={"marginBottom": "10px", "display": "inline-block", "marginRight": "10px"}),
                         html.Button("儲存行程並查看歷史", id="save-itinerary-btn", n_clicks=0, style={"fontSize": 13, "padding": "6px 16px", "backgroundColor": "#56602D", "color": "white", "border": "none", "borderRadius": "999px", "cursor": "pointer"}),
@@ -705,7 +681,7 @@ def get_app_layout(username):
             ], style={"display": "flex", "flexDirection": "row", "marginBottom": "20px"}),
             ], style={"display": "flex", "flexDirection": "column"}),
 
-            html.Div([
+                 html.Div([
                 html.Div([
                     html.H3("預算分析", style={"marginBottom": "10px"}),
                     dcc.Graph(id="budget-pie-chart", style={"width": "100%", "height": "300px"}, config={"displayModeBar": False}),
@@ -717,30 +693,29 @@ def get_app_layout(username):
                 ], style={**STYLES["panel_round"], "overflowY": "hidden", "flex": "1", "minWidth": "0"}),
             ], style={"display": "flex", "flexDirection": "row", "marginBottom": "20px"}),
 
-            # ✅ 只改初始值：載入上次選取
-            dcc.Checklist(id="place-selector", options=[], value=stored_selected, style={"display": "none"}),
+        # ✅ 只改初始值：載入上次選取
+        dcc.Checklist(id="place-selector", options=[], value=stored_selected, style={"display": "none"}),
 
-            # ✅ 只改初始值：載入上次 details（讓右側/圖表能顯示名稱等）
-            dcc.Store(id="all-place-details", data=stored_details),
+        # ✅ 只改初始值：載入上次 details（讓右側/圖表能顯示名稱等）
+        dcc.Store(id="all-place-details", data=stored_details),
 
-            dcc.Store(id="all-options", data=[]),
-            dcc.Store(id="page", data=0),
-            dcc.Store(id="detail-cache", data={}),
-            dcc.Store(id="modal-trigger-state", data={"open": False, "pid": None}),
+        dcc.Store(id="all-options", data=[]),
+        dcc.Store(id="page", data=0),
+        dcc.Store(id="detail-cache", data={}),
+        dcc.Store(id="modal-trigger-state", data={"open": False, "pid": None}),
 
-            # ✅ 只改初始值：載入上次手動預算
-            dcc.Store(id="manual-budget-store", data=stored_budgets),
+        # ✅ 只改初始值：載入上次手動預算
+        dcc.Store(id="manual-budget-store", data=stored_budgets),
 
-            # ✅ 新增：不影響 UI 的 dummy store，用來觸發存檔 callback
-            dcc.Store(id="itinerary-persist-dummy", data=None),
+        # ✅ 新增：不影響 UI 的 dummy store，用來觸發存檔 callback
+        dcc.Store(id="itinerary-persist-dummy", data=None),
 
-            html.Div(id='detail-backdrop', n_clicks=0, style=STYLES["modal_overlay"]),
-            html.Div(id='detail-modal', children="載入中...", style=STYLES["modal_content"]),
+        html.Div(id='detail-backdrop', n_clicks=0, style=STYLES["modal_overlay"]),
+        html.Div(id='detail-modal', children="載入中...", style=STYLES["modal_content"]),
 
-        ], style={"margin": "0 auto", "display": "flex", "flexDirection": "column", "width": "fit-content"}),
+    ], style={"margin": "0 auto", "display": "flex", "flexDirection": "column", "width": "fit-content"}),
 
     ], style=STYLES["container"])
-    
 
 # --- 根 Layout：負責控制所有頁面切換 ---
 app.layout = html.Div([
@@ -782,31 +757,37 @@ def display_page(pathname):
                         html.Div(h.get('created_at', ''), style={"color": "#777", "fontSize": 12, "marginBottom": "6px"}),
                         html.Div(', '.join(names), style={"color": "#555", "fontSize": 13, "marginBottom": "8px", "overflow": "hidden", "textOverflow": "ellipsis"}),
                         html.Div([
-                            html.Button("查看", id={"type": "view-history", "index": h.get('id')}, n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px", "backgroundColor": "#56602d", "color": "white", "border": "none", "borderRadius": "6px", "cursor": "pointer"}),
-                            html.Button("載入", id={"type": "load-history", "index": h.get('id')}, n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px", "backgroundColor": "#F5F1ED", "color": "#705134", "border": "1px solid #705134", "borderRadius": "6px", "cursor": "pointer"}),
-                            html.Button("刪除", id={"type": "delete-history", "index": h.get('id')}, n_clicks=0, style={"backgroundColor": "#F5F1ED", "color": "#705134", "border": "1px solid #705134", "padding": "6px 8px", "borderRadius": "6px", "cursor": "pointer"}),
+                            html.Button("查看", id={"type": "view-history", "index": h.get('id')}, n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px"}),
+                            html.Button("載入", id={"type": "load-history", "index": h.get('id')}, n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px", "backgroundColor": "#1890ff", "color": "#fff", "border": "none"}),
+                            html.Button("刪除", id={"type": "delete-history", "index": h.get('id')}, n_clicks=0, style={"backgroundColor": "#ff4d4f", "color": "#fff", "border": "none", "padding": "6px 8px"}),
+                            html.Button("改名", id={"type": "rename-history", "index": h.get('id')},n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px"})
                         ])
                     ]
 
-                    cards.append(html.Div(card_children, style={"width": "23%", "backgroundColor": "#f5f1ed", "border": "1px solid #eee", "borderRadius": "6px", "padding": "10px", "boxSizing": "border-box", "marginBottom": "12px", "boxShadow": "0 4px 12px rgba(0,0,0,0.08)"}))
+                    cards.append(html.Div(card_children, style={"width": "23%", "border": "1px solid #eee", "borderRadius": "6px", "padding": "10px", "boxSizing": "border-box", "marginBottom": "12px"}))
 
                 grid = html.Div(cards, style={"display": "flex", "flexWrap": "wrap", "gap": "1%"})
 
                 return html.Div([
                     html.Div([
                         html.Div([
-                            dcc.Link(html.Button("回到主頁", style={"padding": "6px 10px", "marginRight": "8px", "backgroundColor": "#56602d", "color": "white", "border": "none", "borderRadius": "6px", "cursor": "pointer"}), href='/'),
-                            html.Button("新增新的行程", id='new-itinerary-btn', n_clicks=0, style={"padding": "6px 10px", "backgroundColor": "#56602d", "color": "white", "border": "none", "borderRadius": "6px", "cursor": "pointer"}),
+                            dcc.Link(html.Button("回到主頁", style={"padding": "6px 10px", "marginRight": "8px"}), href='/'),
+                            html.Button("新增新的行程", id='new-itinerary-btn', n_clicks=0, style={"padding": "6px 10px"}),
                         ], style={"textAlign": "right"})
                     ], style={"marginBottom": "10px"}),
-                    html.Div(
+                     html.Div(
                         html.H2("我的歷史行程", style={"margin": "0"}),
                         style={"marginBottom": "12px", "backgroundColor": "rgba(255,255,255,0.85)", "padding": "12px 16px", "borderRadius": "10px", "boxShadow": "0 6px 16px rgba(0,0,0,0.12)"}
                     ),
                     grid,
                     # 詳細 modal（會由 callback 控制顯示/內容）
-                    html.Div(id='history-detail-backdrop', style={**STYLES.get("modal_overlay", {}), "display": "none"}),
-                    html.Div(id='history-detail-modal', style={**STYLES.get("modal_content", {}), "display": "none"}),
+                    # 修改後的版本：確保有空字串作為 children 佔位符
+                    html.Div(id='history-detail-backdrop', n_clicks=0, style={**STYLES.get("modal_overlay", {}), "display": "none"}),
+                    html.Div(id='history-detail-modal', children="", style={**STYLES.get("modal_content", {}), "display": "none"}),
+                    # 放在 /history 頁面 layout（return html.Div([...])）的末尾、跟 detail modal 同層
+                    html.Div(id='rename-backdrop', n_clicks=0, style={**STYLES.get("modal_overlay", {}), "display": "none"}),
+                    html.Div(id='rename-modal',children="",style={**STYLES.get("modal_content", {}), "display": "none"}),
+                    dcc.Store(id="rename-target", data={"id": None}),
                 ], style=STYLES["container"])
             return get_app_layout(current_user.username)
         else:
@@ -820,21 +801,27 @@ def display_page(pathname):
     State('login-pwd', 'value'),
     prevent_initial_call=True
 )
+# --- 修改前 ---
+# with DB_LOCK:
+#     c.execute("SELECT id, username, password FROM users WHERE username = ?", (username,))
+#     user_data = c.fetchone()
+
+# --- 修改後 (簡單版) ---
 def login_callback(n_clicks, username, password):
     if not username or not password:
         return no_update, "請輸入帳號密碼"
 
     conn = db_connect()
     c = conn.cursor()
-    with DB_LOCK:
-        c.execute("SELECT id, username, password FROM users WHERE username = ?", (username,))
-        user_data = c.fetchone()
+    # 直接執行，不使用 DB_LOCK
+    c.execute("SELECT id, username, password FROM users WHERE username = ?", (username,))
+    user_data = c.fetchone()
     conn.close()
 
     if user_data and check_password_hash(user_data[2], password):
         user = User(id=user_data[0], username=user_data[1])
         login_user(user)
-        return '/', ""  # 登入成功，跳轉回首頁
+        return '/', ""
     else:
         return no_update, "帳號或密碼錯誤"
 
@@ -852,18 +839,18 @@ def register_callback(n_clicks, username, password):
 
     conn = db_connect()
     c = conn.cursor()
-    with DB_LOCK:
-        c.execute("SELECT id FROM users WHERE username = ?", (username,))
-        if c.fetchone():
-            conn.close()
-            return no_update, "帳號已存在"
+    # 移除 with DB_LOCK:
+    c.execute("SELECT id FROM users WHERE username = ?", (username,))
+    if c.fetchone():
+        conn.close()
+        return no_update, "帳號已存在"
 
-        hashed_pw = generate_password_hash(password)
-        c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_pw))
-        conn.commit()
+    hashed_pw = generate_password_hash(password)
+    c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_pw))
+    conn.commit()
     conn.close()
 
-    return '/login', ""  # 註冊成功，跳轉登入頁
+    return '/login', ""
 
 # ----------------------------------------------------
 # ✅ 新增：已選行程自動儲存（不影響任何原 UI/邏輯）
@@ -934,7 +921,7 @@ def search_and_build_options(submit_addr, submit_budget, n_clicks, address, budg
 
     # 以評論數排序作為「熱門程度」（若 nearby 未提供則會嘗試用 details API 取得）
     nearby_scored = calculate_popularity_score(nearby, apikey=API_KEY)
-    max_pl = 1 if budget <= 200 else 2 if budget <= 600 else 3 if budget <= 1000 else 4
+    max_pl = 1 if budget <= 200 else 2 if budget <= 400 else 3 if budget <= 1400 else 4
 
     new_details = old_details.copy() if old_details else {}
     options = []
@@ -978,20 +965,14 @@ def save_itinerary_and_go(n_clicks, selected, all_details, budgets):
     prevent_initial_call=True,
 )
 def handle_delete_history(n_clicks_list):
-    ctx = callback_context
-    if not ctx.triggered:
+    # 檢查是否有按鈕被點擊
+    if not any(n_clicks_list):
         return no_update
-    triggered_prop = ctx.triggered[0].get('prop_id')
-    parsed = _parse_triggered_id(triggered_prop)
-    if not parsed:
+        
+    # 替換掉原本報錯的 _parse_triggered_id 邏輯
+    entry_id = _get_triggered_index() 
+    if entry_id is None or not current_user.is_authenticated:
         return no_update
-    try:
-        entry_id = int(parsed.get('index')) if parsed.get('index') is not None else None
-    except Exception:
-        entry_id = parsed.get('index')
-
-    if not current_user.is_authenticated:
-        return '/login'
 
     delete_itinerary_history(entry_id, current_user.id)
     return '/history'
@@ -999,113 +980,191 @@ def handle_delete_history(n_clicks_list):
 
 # 顯示歷史行程細節（modal）
 @app.callback(
-    [Output('history-detail-modal', 'style'),
-     Output('history-detail-backdrop', 'style'),
-     Output('history-detail-modal', 'children')],
+    [Output('history-detail-modal', 'style'),        # 必須對應 Layout 的 ID
+     Output('history-detail-backdrop', 'style'),     # 必須對應 Layout 的 ID
+     Output('history-detail-modal', 'children')],    # 必須對應 Layout 的 ID
     [Input({'type': 'view-history', 'index': ALL}, 'n_clicks')],
     prevent_initial_call=True,
 )
 def show_history_detail(n_clicks_list):
-    try:
-        # 事實檢查：確認是否有按鈕被點擊
-        if not any(n_clicks for n_clicks in n_clicks_list if n_clicks):
-            return no_update, no_update, no_update
-
-        entry_id = _get_triggered_index() # 使用新的解析函式
-        if entry_id is None:
-            return no_update, no_update, no_update
-
-        if not current_user.is_authenticated:
-            return no_update, no_update, "請先登入"
-
-        # 先嘗試使用 load_user_itineraries（已在其他地方使用且正確返回），避免直接 DB 單筆查詢的 race-condition
-        try:
-            histories = load_user_itineraries(current_user.id)
-            target = next((h for h in histories if h.get('id') == int(entry_id)), None)
-            print(f"[DEBUG] show_history_detail: searched in load_user_itineraries, found={bool(target)} for id={entry_id}")
-        except Exception as e:
-            print(f"[ERROR] show_history_detail: load_user_itineraries failed: {e}")
-            target = None
-
-        # 若仍找不到，才使用單筆查詢作為最後手段（並會在 get_history_entry 中有詳細備援輸出）
-        if not target:
-            # 嘗試重試數次以容許短暫的一致性延遲
-            import time
-            target = None
-            for attempt in range(1, 4):
-                target = get_history_entry(int(entry_id), int(current_user.id))
-                print(f"[DEBUG] show_history_detail: retry attempt={attempt}, found={bool(target)} for id={entry_id}")
-                if target:
-                    break
-                time.sleep(0.1)
-
-        if not target:
-            return no_update, no_update, "找不到該筆行程"
-
-        # 重新構建 Modal 內容，確保關閉按鈕的 ID 被正確生成
-        sel = target.get('selected', [])
-        details = target.get('details', {})
-        items = []
-        for i, pid in enumerate(sel):
-            d = details.get(pid, {})
-            items.append(html.Div([
-                html.Strong(f"{i+1}. {d.get('name', pid)}"),
-                html.Div(f"地址: {d.get('vicinity', '無')}", style={"fontSize": "13px", "color": "#666"})
-            ], style={"marginBottom": "10px", "paddingBottom": "5px", "borderBottom": "1px solid #eee"}))
-
-        content = html.Div([
-            html.H2(target.get('title', '歷史行程詳情'), style={"marginTop": "0"}),
-            html.Div(f"建立時間：{target.get('created_at', '')}", style={"color": "#999", "fontSize": "12px", "marginBottom": "15px"}),
-            html.Div(items if items else "無內容", style={"maxHeight": "400px", "overflowY": "auto"}),
-            html.Hr(),
-            html.Button("關閉視窗", id={'type': 'close-history-detail', 'index': entry_id}, 
-                        n_clicks=0, style={**STYLES["btn_primary"], "backgroundColor": "#555", "float": "right"})
-        ])
-
-        # 明確回傳顯示狀態
-        modal_style = {**STYLES.get('modal_content', {}), 'display': 'block'}
-        overlay_style = {**STYLES.get('modal_overlay', {}), 'display': 'block'}
-        return modal_style, overlay_style, content
-    except Exception as e:
-        print(f"[ERROR] show_history_detail exception: {e}")
-        import traceback
-        traceback.print_exc()
+    # 診斷點 1：檢查是否真的有點擊觸發
+    if not any(n_clicks for n_clicks in n_clicks_list if n_clicks > 0):
+        print(">>> [DEBUG] 回調觸發，但無點擊次數，跳過更新") #
         return no_update, no_update, no_update
 
-    # Build detail content
-    sel = target.get('selected', [])
-    details = target.get('details', {})
+    entry_id = _get_triggered_index() #
+    target = get_history_entry(entry_id, current_user.id) #
+    
+    if not target:
+        print(f">>> [DEBUG] 找不到 ID={entry_id} 的行程") #
+        return no_update, no_update, "找不到行程資料"
+
+    # 生成詳細清單內容
+    sel = target.get('selected', []) #
+    budgets = target.get('budgets', {}) #
+    details = target.get('details', {}) #
+    
     items = []
     for i, pid in enumerate(sel):
-        d = details.get(pid, {})
+        p = details.get(pid, {})
+        cost = budgets.get(pid, 0)
         items.append(html.Div([
-            html.Strong(f"{i+1}. {d.get('name', pid)}"),
-            html.Div(f"地址: {d.get('vicinity', '無')}")
-        ], style={"marginBottom": "8px"}))
+            html.Div(f"{i+1}. {p.get('name', pid)}", style={"fontWeight": "bold"}),
+            html.Small(f"預算: {cost} | 熱門度: {p.get('popularity_score', 0)}", style={"color": "#666"})
+        ], style={"padding": "10px", "borderBottom": "1px solid #eee"}))
 
     content = html.Div([
-        html.H2(target.get('title', '歷史行程詳情')),
-        html.Div(f"建立時間：{target.get('created_at', '')}", style={"color": "#777", "marginBottom": "8px"}),
-        html.Div(items or "無內容"),
-        html.Button("關閉", id={'type': 'close-history-detail', 'index': entry_id}, n_clicks=0, style={"float": "right", "marginTop": "10px"})
-    ], style={"maxHeight": "70vh", "overflowY": "auto"})
+        html.H3(target.get('title', '行程詳情')),
+        html.Div(items, style={"maxHeight": "300px", "overflowY": "auto"}),
+        html.Hr(),
+        html.Button("關閉", id={'type': 'close-history-detail', 'index': entry_id}, 
+                    style={**STYLES["btn_primary"], "backgroundColor": "#555", "width": "100%"})
+    ])
 
-    return {**STYLES.get('modal_content', {}), 'display': 'block'}, {**STYLES.get('modal_overlay', {}), 'display': 'block'}, content
+    # 診斷點 2：強制回傳 block，且 zIndex 必須最高
+    print(f">>> [DEBUG] 成功推送到畫面，ID={entry_id}") #
+    return {**STYLES["modal_content"], "display": "block", "zIndex": 9999}, \
+           {**STYLES["modal_overlay"], "display": "block", "zIndex": 9998}, \
+           content
 
-
-# 關閉歷史詳情 modal
+# 關閉 Modal (修正後的單一邏輯) 
+# 確保這是你程式碼中「唯一」一個處理關閉 Modal 的 Callback
 @app.callback(
     [Output('history-detail-modal', 'style', allow_duplicate=True),
      Output('history-detail-backdrop', 'style', allow_duplicate=True)],
-    [Input({'type': 'close-history-detail', 'index': ALL}, 'n_clicks'),
-     Input('history-detail-backdrop', 'n_clicks')],
+    [Input('history-detail-backdrop', 'n_clicks'),
+     Input({'type': 'close-history-detail', 'index': ALL}, 'n_clicks')],
     prevent_initial_call=True,
 )
-def close_history_detail(close_clicks, backdrop_clicks):
-    # 無論觸發哪個，都回傳隱藏樣式
-    hidden_modal = {**STYLES.get('modal_content', {}), 'display': 'none'}
-    hidden_overlay = {**STYLES.get('modal_overlay', {}), 'display': 'none'}
-    return hidden_modal, hidden_overlay
+def clean_close_modal(bg_clicks, btn_clicks):
+    ctx = callback_context
+    if not ctx.triggered:
+        return no_update, no_update
+
+    trig = ctx.triggered[0]["prop_id"]
+
+    # 只有「真的點擊」才關
+    if ("history-detail-backdrop" in trig and (bg_clicks or 0) > 0) or \
+       ("close-history-detail" in trig and any((c or 0) > 0 for c in (btn_clicks or []))):
+        return ({**STYLES["modal_content"], "display": "none"},
+                {**STYLES["modal_overlay"], "display": "none"})
+
+    return no_update, no_update
+
+# (A) 點「改名」→ 開啟 modal、記住 entry_id
+@app.callback(
+    Output("rename-modal", "style"),
+    Output("rename-backdrop", "style"),
+    Output("rename-modal", "children"),
+    Output("rename-target", "data"),
+    Input({"type": "rename-history", "index": ALL}, "n_clicks"),
+    prevent_initial_call=True,
+)
+def open_rename_modal(n_clicks_list):
+    if not any(n_clicks_list):
+        return no_update, no_update, no_update, no_update
+
+    entry_id = _get_triggered_index()
+    if entry_id is None or not current_user.is_authenticated:
+        return no_update, no_update, no_update, no_update
+
+    target = get_history_entry(entry_id, current_user.id)
+    if not target:
+        return no_update, no_update, "找不到行程資料", no_update
+
+    content = html.Div([
+        html.H3("修改歷史行程名稱"),
+        dcc.Input(id="rename-input", type="text", value=target.get("title", ""), style={"width": "100%", "padding": "8px"}),
+        html.Div(id="rename-msg", style={"color": "red", "marginTop": "8px"}),
+        html.Div([
+            html.Button("取消", id="rename-cancel", n_clicks=0, style={"padding": "6px 10px", "marginRight": "8px"}),
+            html.Button("儲存", id="rename-save", n_clicks=0, style={**STYLES["btn_primary"], "padding": "6px 10px"}),
+        ], style={"marginTop": "12px", "textAlign": "right"})
+    ])
+
+    return (
+        {**STYLES["modal_content"], "display": "block", "zIndex": 9999},
+        {**STYLES["modal_overlay"], "display": "block", "zIndex": 9998},
+        content,
+        {"id": entry_id},
+    )
+
+# (B) 儲存 / 取消 / 點背景 → 關閉 modal；儲存時只改 title 且不允許同名
+@app.callback(
+    Output("rename-modal", "style", allow_duplicate=True),
+    Output("rename-backdrop", "style", allow_duplicate=True),
+    Output("rename-msg", "children"),
+    Output("url", "pathname", allow_duplicate=True),  # 成功後刷新 /history 讓卡片立刻更新
+    Input("rename-backdrop", "n_clicks"),
+    Input("rename-cancel", "n_clicks"),
+    Input("rename-save", "n_clicks"),
+    State("rename-input", "value"),
+    State("rename-target", "data"),
+    prevent_initial_call=True,
+)
+
+def submit_rename(bg, cancel, save, new_title, target):
+    ctx = callback_context
+    print("RENAME submit triggered:", ctx.triggered)
+
+    if not ctx.triggered:
+        raise PreventUpdate
+
+    # ✅ 找出「真的被點到」的那個 trigger（value > 0）
+    fired = None
+    for t in ctx.triggered:
+        prop = t.get("prop_id", "")
+        val = t.get("value", None)
+        if prop.startswith("rename-backdrop") and (bg or 0) > 0:
+            fired = "backdrop"
+            break
+        if prop.startswith("rename-cancel") and (cancel or 0) > 0:
+            fired = "cancel"
+            break
+        if prop.startswith("rename-save") and (save or 0) > 0:
+            fired = "save"
+            break
+
+    # ✅ 這就是你現在的問題：動態插入元件時會觸發 (value=0)
+    if fired is None:
+        raise PreventUpdate
+
+    # 關閉（取消或點背景）
+    if fired in ["backdrop", "cancel"]:
+        return (
+            {**STYLES["modal_content"], "display": "none"},
+            {**STYLES["modal_overlay"], "display": "none"},
+            "",
+            no_update
+        )
+
+    # fired == "save"：儲存
+    if not current_user.is_authenticated:
+        return (
+            {**STYLES["modal_content"], "display": "none"},
+            {**STYLES["modal_overlay"], "display": "none"},
+            "",
+            "/login"
+        )
+
+    entry_id = (target or {}).get("id")
+    if entry_id is None:
+        return no_update, no_update, "找不到目標紀錄", no_update
+
+    res = rename_itinerary_history(entry_id, current_user.id, new_title)
+
+    if not res.get("ok"):
+        # 不關閉：顯示錯誤（含同名）
+        return no_update, no_update, res.get("msg", "更新失敗"), no_update
+
+    # 成功：關閉並刷新
+    return (
+        {**STYLES["modal_content"], "display": "none"},
+        {**STYLES["modal_overlay"], "display": "none"},
+        "",
+        "/history"
+    )
+
 
 
 # 載入歷史行程到主頁（保存為目前選取，然後導回主頁）
@@ -1115,27 +1174,20 @@ def close_history_detail(close_clicks, backdrop_clicks):
     prevent_initial_call=True,
 )
 def load_history_to_main(n_clicks_list):
-    ctx = callback_context
-    if not ctx.triggered:
+    # 檢查是否有按鈕被點擊
+    if not any(n_clicks_list):
         return no_update
-    triggered_prop = ctx.triggered[0].get('prop_id')
-    parsed = _parse_triggered_id(triggered_prop)
-    if not parsed:
+        
+    # 替換掉原本報錯的 _parse_triggered_id 邏輯
+    entry_id = _get_triggered_index()
+    if entry_id is None or not current_user.is_authenticated:
         return no_update
-    try:
-        entry_id = int(parsed.get('index')) if parsed.get('index') is not None else None
-    except Exception:
-        entry_id = parsed.get('index')
 
-    if not current_user.is_authenticated:
-        return '/login'
-
-    histories = load_user_itineraries(current_user.id)
-    target = next((h for h in histories if h.get('id') == entry_id), None)
+    # 直接讀取資料庫，並覆寫目前的 itineraries
+    target = get_history_entry(entry_id, current_user.id)
     if not target:
         return no_update
 
-    # 將該歷史項目儲存為目前使用者的 selected（覆蓋），之後回到主頁以載入
     try:
         save_user_itinerary(current_user.id, target.get('selected', []), target.get('budgets', {}), target.get('details', {}))
     except Exception as e:
@@ -1188,11 +1240,6 @@ def render_page(all_options, page, selected_values, all_details):
         p = all_details.get(pid, {})
         photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=180&photo_reference={p.get('photo_reference')}&key={API_KEY}" if p.get("photo_reference") else None
 
-        # --- 修正處 1：價格等級顯示邏輯 ---
-        pl_int = p.get("price_level_int")
-        # 如果有等級就顯示對應數量的 $，沒有就顯示未知
-        price_display = html.Span("$" * pl_int, style={"color": "#2e7d32", "fontWeight": "bold", "marginLeft": "5px"}) if pl_int else "價格：未知"
-
         cards.append(html.Div([
             dcc.Checklist(
                 options=[{"label": "", "value": pid}],
@@ -1207,16 +1254,11 @@ def render_page(all_options, page, selected_values, all_details):
                     html.Span(f" ｜ 熱門程度 {p.get('popularity_score', 0)}", style={"color": "#ffa000", "marginLeft": "4px"})
                 ]),
                 html.Div(f"地址：{p.get('vicinity', '無')}", style={"color": "#555", "fontSize": 14}),
-# --- 2. 修改此處：顯示評分、價格與距離 ---
-            html.Div([
-                f"評分：{p.get('rating', '無')} ｜ ",
-                price_display,
-                f" ｜ 距離：{p.get('distance_km', 0):.2f} km"
-            ], style={"color": "#777", "fontSize": 13}),
-            
-            html.Button("查看詳情", id={"type": "detail-btn", "index": pid}, style={"marginTop": "4px", "fontSize": 13, "padding": "4px 12px", "backgroundColor": "#56602D", "color": "white", "border": "none", "borderRadius": "999px", "cursor": "pointer"})
-        ], style={"width": "calc(100% - 130px)"})
-    ], style={"display": "flex", "alignItems": "center", "marginBottom": "10px", "borderBottom": "1px solid #eee", "paddingBottom": "10px"}))
+                html.Div(f"評分：{p.get('rating', '無')} ｜ 距離：{p.get('distance_km', 0):.2f} km", style={"color": "#777", "fontSize": 13}),
+                html.Button("查看詳情", id={"type": "detail-btn", "index": pid}, style={"marginTop": "4px", "fontSize": 13, "padding": "2px 8px"})
+            ], style={"width": "calc(100% - 130px)"})
+        ], style={"display": "flex", "alignItems": "center", "marginBottom": "10px", "borderBottom": "1px solid #eee", "paddingBottom": "10px"}))
+
     max_page = max((len(all_options) - 1) // PAGE_SIZE + 1, 1)
     return cards, f"第 {page + 1} / {max_page} 頁"
 
@@ -1266,6 +1308,7 @@ def sync_selection(checks, removes, ups, downs, current):
         if 0 <= swap_idx < len(current):
             current[idx], current[swap_idx] = current[swap_idx], current[idx]
     return current
+
 
 @app.callback(
     Output("manual-budget-store", "data"),
@@ -1368,7 +1411,7 @@ def update_budget_logic(input_vals, selected, total_trip_limit, single_budget_li
 @app.callback(
     Output("selected-itinerary", "children"),
     Input("place-selector", "value"),
-    Input("manual-budget-store", "data"),  # 監聽 store，確保介面同步「跳動」
+    State("manual-budget-store", "data"),
     State("all-place-details", "data"),
 )
 def render_selected(selected, budgets, details):
@@ -1496,12 +1539,6 @@ def render_modal_content(state, cache):
         html.P([html.Strong("地址: "), res.get("formatted_address")]),
         html.P([html.Strong("電話: "), res.get("formatted_phone_number", "無")]),
         html.P([html.Strong("狀態: "), html.Span(status_text, style={"color": "green" if open_now else "red"})]),
-        # 如果店家有官網，也可以順便加上
-        html.P([
-            html.Strong("官方網站: "),
-            html.A("點擊前往", href=res.get("website"), target="_blank", 
-                   style={"color": "#1976D2", "textDecoration": "underline"}) if res.get("website") else "無提供"
-        ]),
         html.Hr(),
         html.H4("最新評論"),
         html.Div([
