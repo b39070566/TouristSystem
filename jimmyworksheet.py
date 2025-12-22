@@ -38,6 +38,13 @@ login_manager.login_view = '/login'
 # 備援機制：優先使用第一個路徑，若不存在則使用第二個路徑
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
+# 修改 DB_NAME 的定義（約第 35 行）
+# 請將這裡改成你電腦上的絕對路徑，且確保資料夾已手動建立
+
+
+DB_NAME = r"D:\data\Documents\GitHub\midterm_new\Midterm\users.db"
+
+
 # 定義多個可能的資料庫路徑（按優先順序）
 DB_PATHS = [
     r"D:\data\Documents\GitHub\midterm_new\Midterm\users.db",  # 第一優先
@@ -373,7 +380,11 @@ if not API_KEY:
         pass
 
 # Fallback（僅在你沒有提供環境變數或 .env 時使用；建議移除或替換為空字串）
-API_KEY = "AIzaSyBU9HJ0M0EspZNoHf40JprQL8tDPZ_UZbU"
+
+if not API_KEY:
+    API_KEY = ""
+
+
 
 PAGE_SIZE = 10
 
@@ -661,35 +672,86 @@ def get_app_layout(username):
     ], style={"display": "flex", "flexDirection": "column"}),
 
             html.Div([
+                # 左側：推薦地點
                 html.Div([
                     html.Div([
                         html.H3("推薦地點", style={"marginBottom": "10px"}),
-                    html.Div(
-                        id="result-container",
-                        children=html.Div("無搜尋結果", style={"color": "#999", "textAlign": "center", "padding": "40px"}),
-                        style=STYLES["card_container"]
-                    ),
-                    html.Div([
-                        html.Button("上一頁", id="prev-page", n_clicks=0, style={"marginRight": "10px", "backgroundColor": "#56602D", "color": "white", "border": "none", "borderRadius": "999px", "padding": "6px 16px", "cursor": "pointer"}),
-                        html.Span(id="page-info", style={"marginRight": "10px"}),
-                        html.Button("下一頁", id="next-page", n_clicks=0, style={"backgroundColor": "#56602D", "color": "white", "border": "none", "borderRadius": "999px", "padding": "6px 16px", "cursor": "pointer"}),
-                    ], style={"marginTop": "10px", "display": "flex", "justifyContent": "center", "alignItems": "center"}),
-                ], style={**STYLES["panel_round"], "flex": "1", "marginRight": "20px"}),
+                        html.Div(
+                            id="result-container",
+                            children=html.Div("無搜尋結果", style={"color": "#999", "textAlign": "center", "padding": "40px"}),
+                            style=STYLES["card_container"]
+                        ),
+                        html.Div([
+                            html.Button("上一頁", id="prev-page", n_clicks=0, style={"marginRight": "10px", "backgroundColor": "#56602D", "color": "white", "border": "none", "borderRadius": "999px", "padding": "6px 16px", "cursor": "pointer"}),
+                            html.Span(id="page-info", style={"marginRight": "10px"}),
+                            html.Button("下一頁", id="next-page", n_clicks=0, style={"backgroundColor": "#56602D", "color": "white", "border": "none", "borderRadius": "999px", "padding": "6px 16px", "cursor": "pointer"}),
+                        ], style={"marginTop": "10px", "display": "flex", "justifyContent": "center", "alignItems": "center"}),
+                    ], style={**STYLES["panel_round"], "flex": "1", "marginRight": "20px"}),
 
-            html.Div([
+                    # 右側：已選行程 (包含使用說明按鈕與彈窗)
                     html.Div([
-                        html.H3("已選行程", style={"marginBottom": "10px", "display": "inline-block", "marginRight": "10px"}),
-                        html.Button("儲存行程並查看歷史", id="save-itinerary-btn", n_clicks=0, style={"fontSize": 13, "padding": "6px 16px", "backgroundColor": "#56602D", "color": "white", "border": "none", "borderRadius": "999px", "cursor": "pointer"}),
-                    ], style={"display": "flex", "alignItems": "center", "justifyContent": "space-between"}),
-                    html.Div(
-                        id="selected-itinerary",
-                        style={**STYLES["card_container"], "backgroundColor": "#fff", "minHeight": "50px"}
-                    ),
-                ], style={**STYLES["panel_round"], "flex": "1"}),
-            ], style={"display": "flex", "flexDirection": "row", "marginBottom": "20px"}),
+                        html.Div([
+                            html.Div([
+                                html.H3("已選行程", style={"marginBottom": "0px", "marginRight": "10px", "display": "inline-block"}),
+                                # --- 新增：使用說明問號按鈕 ---
+# --- 在 get_app_layout 中找到 help-btn 的 style 並修改 ---
+# --- 請找到 get_app_layout 中的 help-btn 並替換 style ---
+# 這裡的新按鈕使用了 flex 屬性與更精確的位移
+                                html.Button("?", id="help-btn", n_clicks=0, style={
+                                    "borderRadius": "50%", 
+                                    "width": "20px", 
+                                    "height": "20px", 
+                                    "border": "1px solid #56602D", 
+                                    "backgroundColor": "transparent",
+                                    "color": "#56602D", 
+                                    "cursor": "pointer", 
+                                    "fontWeight": "bold",
+                                    "fontSize": "12px",         # 稍微縮小問號字體，比例會更協調
+                                    "padding": "0", 
+                                    "display": "flex", 
+                                    "alignItems": "center", 
+                                    "justifyContent": "center",
+                                    "marginLeft": "5px",        # 與文字保持 8px 間距
+                                    "flexShrink": "0",          # 防止按鈕被擠壓變形
+                                    "transform": "translateY(4px)" # 關鍵微調：視覺上中文字的重心較低，向下補償 2px 達致完美對齊
+                                }),
+                            ], style={
+                                "display": "flex",              # 使用 Flex 佈局
+                                "alignItems": "center",         # 強制所有子項（文字與按鈕）垂直居中對齊
+                                "marginBottom": "10px"          # 這一行與下方內容的間距
+                            }),
+                            
+                            html.Button("儲存行程並查看歷史", id="save-itinerary-btn", n_clicks=0, style={"fontSize": 13, "padding": "6px 16px", "backgroundColor": "#56602D", "color": "white", "border": "none", "borderRadius": "999px", "cursor": "pointer"}),
+                        ], style={"display": "flex", "alignItems": "center", "justifyContent": "space-between", "marginBottom": "10px"}),
+                        
+                        html.Div(
+                            id="selected-itinerary",
+                            style={**STYLES["card_container"], "backgroundColor": "#fff", "minHeight": "50px"}
+                        ),
+
+                        # --- 新增：使用說明的彈窗 (Modal) 元件 ---
+                        html.Div(id='help-backdrop', n_clicks=0, style={**STYLES["modal_overlay"], "zIndex": 3000}),
+                        html.Div(id='help-modal', children=[
+                            html.H3("💡 預算分配使用說明", style={"color": "#56602D", "marginTop": "0"}),
+                            html.P("系統依據店家等級自動分配預算上限：", style={"fontWeight": "bold", "marginBottom": "10px"}),
+                            html.Ul([
+                                html.Li("一個錢 ($)：預算 < 200 元"),
+                                html.Li("兩個錢 ($$)：預算 200 ~ 600 元"),
+                                html.Li("三個錢 ($$$)：預算 600 ~ 1000 元"),
+                                html.Li("四個錢 ($$$$)：預算 1000 ~ 2000元 或者 超過2000元 "),
+                                html.Li("※ 若商家未提供金額，系統自動帶入 200 元計算", style={"color": "#d9534f", "marginTop": "10px", "fontWeight": "bold"})
+                            ], style={"lineHeight": "1.8", "fontSize": "15px"}),
+                            html.Hr(style={"margin": "20px 0"}),
+                            html.P("採用該等級之「最高金額」進行初始分配，您可手動修改預算。", style={"fontSize": "14px", "color": "#666"}),
+                            html.Button("我瞭解了", id="close-help", n_clicks=0, style={**STYLES["btn_primary"], "width": "100%", "marginTop": "15px"})
+                        ], style={**STYLES["modal_content"], "zIndex": 3001}),
+
+                    ], style={**STYLES["panel_round"], "flex": "1"}),
+                ], style={"display": "flex", "flexDirection": "row", "marginBottom": "20px"}),
             ], style={"display": "flex", "flexDirection": "column"}),
 
-                 html.Div([
+            # 下方圖表區
+            html.Div([
                 html.Div([
                     html.H3("預算分析", style={"marginBottom": "10px"}),
                     dcc.Graph(id="budget-pie-chart", style={"width": "100%", "height": "300px"}, config={"displayModeBar": False}),
@@ -1246,26 +1308,62 @@ def render_page(all_options, page, selected_values, all_details):
     for opt in page_options:
         pid = opt["value"]
         p = all_details.get(pid, {})
+        
+        price_lvl = p.get("price_level_int")
+        price_icons = "$" * price_lvl if price_lvl and price_lvl > 0 else ""
+        
         photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=180&photo_reference={p.get('photo_reference')}&key={API_KEY}" if p.get("photo_reference") else None
 
+# --- 完整替換開始 ---
         cards.append(html.Div([
             dcc.Checklist(
                 options=[{"label": "", "value": pid}],
                 value=[pid] if pid in selected_values else [],
                 id={"type": "place-check", "index": pid},
-                style={"marginRight": "8px","backgroundColor": "#fff","boxShadow": "0 6px 16px rgba(0,0,0,0.12)","border": "1px solid rgba(0,0,0,0.06)"}
+                style={
+                    "marginRight": "8px",
+                    "backgroundColor": "#fff",
+                    "boxShadow": "0 6px 16px rgba(0,0,0,0.12)",
+                    "border": "1px solid rgba(0,0,0,0.06)"
+                }
             ),
             html.Img(src=photo_url, style={"width": "100px", "height": "100px", "objectFit": "cover", "borderRadius": "4px", "marginRight": "10px"}) if photo_url else None,
             html.Div([
+                # 第一行：名稱
+                html.Div(html.Strong(p.get("name"), style={"fontSize": 17}), style={"marginBottom": "2px"}),
+                
+                # 第二行：金錢符號與熱門度
                 html.Div([
-                    html.Strong(p.get("name"), style={"fontSize": 17}),
-                    html.Span(f" ｜ 熱門程度 {p.get('popularity_score', 0)}", style={"color": "#ffa000", "marginLeft": "4px"})
-                ]),
+                    html.Span(f"{price_icons}", style={"color": "#2e7d32", "fontWeight": "bold"}) if price_icons else None,
+                    html.Span(" ｜ " if price_icons else "", style={"color": "#ddd"}), 
+                    html.Span(f"🔥 熱門度 {p.get('popularity_score', 0)}", style={"color": "#ffa000"})
+                ], style={"fontSize": 14, "marginBottom": "4px"}),
+
+                # 第三、四行：地址與評分資訊
                 html.Div(f"地址：{p.get('vicinity', '無')}", style={"color": "#555", "fontSize": 14}),
                 html.Div(f"評分：{p.get('rating', '無')} ｜ 距離：{p.get('distance_km', 0):.2f} km", style={"color": "#777", "fontSize": 13}),
-                html.Button("查看詳情", id={"type": "detail-btn", "index": pid}, style={**STYLES["btn_primary"], "marginTop": "8px"})
-            ], style={"width": "calc(100% - 130px)"})
-        ], style={"display": "flex", "alignItems": "center", "marginBottom": "10px", "borderBottom": "1px solid #eee", "paddingBottom": "10px"}))
+                
+                # 查看詳情按鈕：整合後的正確版本
+                html.Button(
+                    "查看詳情", 
+                    id={"type": "detail-btn", "index": pid}, 
+                    style={
+                        **STYLES.get("btn_primary", {}), # 優先套用全域樣式
+                        "marginTop": "8px", 
+                        "fontSize": 13, 
+                        "padding": "4px 12px", 
+                        "width": "fit-content"
+                    }
+                )
+            ], style={"width": "calc(100% - 130px)", "display": "flex", "flexDirection": "column"})
+        ], style={
+            "display": "flex", 
+            "alignItems": "center", 
+            "marginBottom": "10px", 
+            "borderBottom": "1px solid #eee", 
+            "paddingBottom": "10px"
+        }))
+        # --- 替換結束 ---
 
     max_page = max((len(all_options) - 1) // PAGE_SIZE + 1, 1)
     return cards, f"第 {page + 1} / {max_page} 頁"
@@ -1425,27 +1523,32 @@ def update_budget_logic(input_vals, selected, total_trip_limit, single_budget_li
 def render_selected(selected, budgets, details):
     if not selected: 
         return html.Div("尚未選擇任何地點", style={"color": "#999", "textAlign": "center", "padding": "40px", "fontWeight": "bold"})
-        return html.Div("尚未選擇任何地點。", style={"color": "#777"})
+    
     items = []
     budgets = budgets or {}
     details = details or {}
-    
-    # 備援渲染對照表
     level_price_map = {1: 200, 2: 600, 3: 1000, 4: 2000}
 
     for i, pid in enumerate(selected):
         p = details.get(pid, {})
+        is_price_unknown = False  # 用來標記是否為未知金額商家
         
         # 決定顯示在 Input 框內的金額
         if pid in budgets:
-            # 優先使用 Store 裡已算好或改過的值
             cost = budgets[pid]
+            # 如果 store 裡的值是 200 且原始資料沒有價格等級，則判定為系統自動給予
+            if cost == 200 and p.get("price_level_int") is None:
+                is_price_unknown = True
         else:
-            # 沒資料時按等級計算（未知 = 200）
             pl = p.get("price_level_int")
-            cost = level_price_map.get(pl, 200) if pl is not None else 200
+            if pl is None:
+                cost = 200
+                is_price_unknown = True
+            else:
+                cost = level_price_map.get(pl, 200)
 
-        items.append(html.Li([
+        # 建立列表內容
+        li_children = [
             html.Div([
                 html.Span(f"{i+1}. {p.get('name')}", style={"fontWeight": "bold"}),
                 html.Div([
@@ -1454,8 +1557,7 @@ def render_selected(selected, budgets, details):
                 ], style={"float": "right"})
             ]),
             html.Div([
-                html.Span("預算: "),
-                # 這裡的 value={cost} 會反映 200/600/1000 等自動填入值
+                html.Span("預算: ", style={"marginRight": "5px"}),
                 dcc.Input(
                     id={"type": "budget-input", "index": pid}, 
                     type="number", 
@@ -1465,7 +1567,16 @@ def render_selected(selected, budgets, details):
                 ),
                 html.Button("移除", id={"type": "remove-btn", "index": pid}, style={"marginLeft":"10px", "fontSize":12, "padding": "4px 12px", "backgroundColor": "#56602D", "color": "white", "border": "none", "borderRadius": "999px", "cursor": "pointer"})
             ], style={"marginTop": "5px"}),
-        ], style={"marginBottom": "10px", "borderBottom": "1px solid #eee", "paddingBottom": "5px"}))
+        ]
+
+        # --- 新增提醒字樣邏輯 ---
+        if is_price_unknown:
+            li_children.append(
+                html.Div("⚠️ 該商家未提供金額，系統自動給予最低預算 200 元", 
+                         style={"color": "#d9534f", "fontSize": "12px", "marginTop": "4px", "fontWeight": "500"})
+            )
+
+        items.append(html.Li(li_children, style={"marginBottom": "10px", "borderBottom": "1px solid #eee", "paddingBottom": "8px"}))
     
     return html.Ol(items, style={"paddingLeft": "0px", "listStyleType": "none"})
 
@@ -1540,13 +1651,25 @@ def render_modal_content(state, cache):
     else:
         res, reviews = fetch_place_details(pid)
         cache[pid] = {"result": res, "reviews": reviews}
+    
+    # 取得網址資料
+    website_url = res.get("website")
     open_now = res.get("opening_hours", {}).get("open_now")
     status_text = "✅ 營業中" if open_now else "❌ 休息中" if open_now is False else "未知"
+    
     content = html.Div([
         html.H2(res.get("name"), style={"marginTop": 0}),
         html.P([html.Strong("地址: "), res.get("formatted_address")]),
         html.P([html.Strong("電話: "), res.get("formatted_phone_number", "無")]),
         html.P([html.Strong("狀態: "), html.Span(status_text, style={"color": "green" if open_now else "red"})]),
+        
+        # --- 在這裡新增網址 ---
+        html.P([
+            html.Strong("網址: "),
+            html.A(website_url, href=website_url, target="_blank", style={"color": "#1890ff", "wordBreak": "break-all"}) if website_url else "無提供網址"
+        ]),
+        # --------------------
+
         html.Hr(),
         html.H4("最新評論"),
         html.Div([
@@ -1560,6 +1683,28 @@ def render_modal_content(state, cache):
     ])
     return {**STYLES["modal_content"], "display": "block"}, {**STYLES["modal_overlay"], "display": "block"}, content, cache
 
+@app.callback(
+    [Output("help-modal", "style"),
+     Output("help-backdrop", "style")],
+    [Input("help-btn", "n_clicks"),
+     Input("close-help", "n_clicks"),
+     Input("help-backdrop", "n_clicks")],
+    prevent_initial_call=True
+)
+def toggle_help_modal(n_open, n_close, n_bg):
+    ctx = callback_context
+    if not ctx.triggered:
+        return no_update, no_update
+    
+    trig_id = ctx.triggered[0]["prop_id"].split(".")[0]
+    
+    # 點擊問號按鈕開啟，點擊關閉按鈕或背景則隱藏
+    if trig_id == "help-btn":
+        return {**STYLES["modal_content"], "display": "block", "zIndex": 3001}, \
+               {**STYLES["modal_overlay"], "display": "block", "zIndex": 3000}
+    
+    return {**STYLES["modal_content"], "display": "none"}, \
+           {**STYLES["modal_overlay"], "display": "none"}
 # --- 找到程式碼約第 100 行的這一行並「刪除」 ---
 # init_db()  <-- 務必刪掉！
 
