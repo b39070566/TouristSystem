@@ -1,5 +1,6 @@
 import dash
 from dash import dcc, html, Output, Input, State, no_update, callback_context
+from dash.exceptions import PreventUpdate
 from dash.dependencies import ALL
 import requests
 import json
@@ -40,7 +41,6 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 # 修改 DB_NAME 的定義（約第 35 行）
 # 請將這裡改成你電腦上的絕對路徑，且確保資料夾已手動建立
-<<<<<<< Updated upstream
 
 
 DB_NAME = r"D:\data\Documents\GitHub\midterm_new\Midterm\users.db"
@@ -73,12 +73,6 @@ if DB_NAME is None:
             print(f"⚠️ 無法建立目錄 {db_dir}，改用本地目錄")
             DB_NAME = DB_PATHS[-1]  # 使用本地目錄作為最終備援
     print(f"✅ 將建立新資料庫: {DB_NAME}")
-=======
-DB_NAME = r"d:\Users\master_file\PythonCode_Basic\Midterm-main\users.db"
-
-# 建議在這裡加一行 print，啟動時你就能在終端機看到正確路徑
-print(f"✅ 資料庫絕對路徑設定為: {DB_NAME}")
->>>>>>> Stashed changes
 
 # 1. 移除 DB_LOCK，保留最基礎的連線與初始化
 def db_connect():
@@ -389,13 +383,9 @@ if not API_KEY:
 # Fallback（僅在你沒有提供環境變數或 .env 時使用；建議移除或替換為空字串）
 
 if not API_KEY:
-<<<<<<< Updated upstream
-    API_KEY = ""
+    API_KEY = "AIzaSyAdq8R2gfquydGPqnW64QygfxCZRXGHmEc"
 
 
-=======
-    API_KEY = "YOUR_GOOGLE_MAPS_API_KEY_HERE"
->>>>>>> Stashed changes
 
 PAGE_SIZE = 10
 
@@ -645,7 +635,7 @@ def get_app_layout(username):
                         ], style={"display": "flex", "alignItems": "center", "gap": "2px"}),
                         html.Div([
                             dcc.Input(
-                                id="total-trip-budget", type="number", placeholder="預算上限 (TWD)", value=None, style=STYLES["input_budget"]
+                                id="total-trip-budget", type="number", placeholder="預算上限 (TWD)",  value=(stored_budgets or {}).get("__total_trip_budget__"),style=STYLES["input_budget"]
                             ),
                             html.Span("*", style={"color": "red", "fontWeight": "bold", "marginLeft": "4px", "fontSize": "16px"}),
                         ], style={"display": "flex", "alignItems": "center", "gap": "2px"}),
@@ -699,11 +689,7 @@ def get_app_layout(username):
                         ], style={"marginTop": "10px", "display": "flex", "justifyContent": "center", "alignItems": "center"}),
                     ], style={**STYLES["panel_round"], "flex": "1", "marginRight": "20px"}),
 
-<<<<<<< Updated upstream
                     # 右側：已選行程 (包含使用說明按鈕與彈窗)
-=======
-            html.Div([
->>>>>>> Stashed changes
                     html.Div([
                         html.Div([
                             html.Div([
@@ -765,12 +751,8 @@ def get_app_layout(username):
                 ], style={"display": "flex", "flexDirection": "row", "marginBottom": "20px"}),
             ], style={"display": "flex", "flexDirection": "column"}),
 
-<<<<<<< Updated upstream
             # 下方圖表區
             html.Div([
-=======
-                 html.Div([
->>>>>>> Stashed changes
                 html.Div([
                     html.H3("預算分析", style={"marginBottom": "10px"}),
                     dcc.Graph(id="budget-pie-chart", style={"width": "100%", "height": "300px"}, config={"displayModeBar": False}),
@@ -809,6 +791,7 @@ def get_app_layout(username):
 # --- 根 Layout：負責控制所有頁面切換 ---
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
+    dcc.Store(id="editing-history-id", data=None),
     html.Div(id='page-content')
 ])
 
@@ -835,19 +818,21 @@ def display_page(pathname):
                 histories = load_user_itineraries(current_user.id)
                 cards = []
                 for h in histories:
+                    total_trip_budget = (h.get("budgets", {}) or {}).get("__total_trip_budget__")
                     # 顯示簡短的行程資訊（標題、建立時間、幾個地點名稱）
                     names = []
                     for pid in h.get('selected', [])[:6]:
                         d = h.get('details', {}).get(pid, {})
                         names.append(d.get('name', pid))
+                        
 
                     card_children = [
                         html.Div(h.get('title', ''), style={"fontWeight": "bold", "marginBottom": "6px"}),
                         html.Div(h.get('created_at', ''), style={"color": "#777", "fontSize": 12, "marginBottom": "6px"}),
+                        html.Div(f"總預算：{total_trip_budget if total_trip_budget is not None else '-'}",style={"color": "#555", "fontSize": 13, "marginBottom": "8px"}),
                         html.Div(', '.join(names), style={"color": "#555", "fontSize": 13, "marginBottom": "8px", "overflow": "hidden", "textOverflow": "ellipsis"}),
-<<<<<<< Updated upstream
                         html.Div([html.Button("查看",id={"type": "view-history", "index": h.get('id')},n_clicks=0,style={"padding": "6px 10px","borderRadius": "8px","border": "1px solid #3F5D3A","backgroundColor": "transparent","color": "#3F5D3A","cursor": "pointer"}),
-                                  html.Button("載入",id={"type": "load-history", "index": h.get('id')},n_clicks=0,style={"padding": "6px 10px","borderRadius": "8px","backgroundColor": "#3F5D3A","color": "#FFFFFF","border": "none","cursor": "pointer"}),
+                                  html.Button("更新",id={"type": "update-history", "index": h.get('id')},n_clicks=0,style={"padding": "6px 10px","borderRadius": "8px","backgroundColor": "#3F5D3A","color": "#FFFFFF","border": "none","cursor": "pointer"}),
                                   html.Button("刪除",id={"type": "delete-history", "index": h.get('id')},n_clicks=0,style={"padding": "6px 10px","borderRadius": "8px","backgroundColor": "#8B2C2C","color": "#FFFFFF","border": "none","cursor": "pointer"}),
                                   html.Button("改名",id={"type": "rename-history", "index": h.get('id')},n_clicks=0,style={"padding": "6px 10px","borderRadius": "8px","border": "1px solid #6B7C6C","backgroundColor": "transparent","color": "#2F3A2F","cursor": "pointer"})],
                                 style={"display": "flex","gap": "10px",          # ✅ 等距關鍵在這"flexWrap": "wrap","marginTop": "8px"
@@ -855,30 +840,14 @@ def display_page(pathname):
                                ]
 
                     cards.append(html.Div(card_children, style={"width": "23%", "border": "2px solid #FFFFFF", "borderRadius": "10px", "padding": "14px", "boxSizing": "border-box", "marginBottom": "12px", "backgroundColor": "rgba(255, 255, 255, 0.85)", "boxShadow": "0 4px 12px rgba(0,0,0,0.1)"}))
-=======
-                        html.Div([
-                            html.Button("查看", id={"type": "view-history", "index": h.get('id')}, n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px"}),
-                            html.Button("載入", id={"type": "load-history", "index": h.get('id')}, n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px", "backgroundColor": "#1890ff", "color": "#fff", "border": "none"}),
-                            html.Button("刪除", id={"type": "delete-history", "index": h.get('id')}, n_clicks=0, style={"backgroundColor": "#ff4d4f", "color": "#fff", "border": "none", "padding": "6px 8px"}),
-                            html.Button("改名", id={"type": "rename-history", "index": h.get('id')},n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px"})
-                        ])
-                    ]
-
-                    cards.append(html.Div(card_children, style={"width": "23%", "border": "1px solid #eee", "borderRadius": "6px", "padding": "10px", "boxSizing": "border-box", "marginBottom": "12px"}))
->>>>>>> Stashed changes
 
                 grid = html.Div(cards, style={"display": "flex", "flexWrap": "wrap", "gap": "1%"})
 
                 return html.Div([
                     html.Div([
                         html.Div([
-<<<<<<< Updated upstream
                             dcc.Link(html.Button("回到主頁", style={"padding": "8px 16px", "borderRadius": "8px", "backgroundColor": "#3F5D3A", "color": "#FFFFFF", "border": "none", "cursor": "pointer", "marginRight": "10px", "fontSize": "14px", "fontWeight": "500"}), href='/'),
                             html.Button("新增新的行程", id='new-itinerary-btn', n_clicks=0, style={"padding": "8px 16px", "borderRadius": "8px", "backgroundColor": "#3F5D3A", "color": "#FFFFFF", "border": "none", "cursor": "pointer", "fontSize": "14px", "fontWeight": "500"}),
-=======
-                            dcc.Link(html.Button("回到主頁", style={"padding": "6px 10px", "marginRight": "8px"}), href='/'),
-                            html.Button("新增新的行程", id='new-itinerary-btn', n_clicks=0, style={"padding": "6px 10px"}),
->>>>>>> Stashed changes
                         ], style={"textAlign": "right"})
                     ], style={"marginBottom": "10px"}),
                      html.Div(
@@ -1027,7 +996,7 @@ def search_and_build_options(submit_addr, submit_budget, n_clicks, address, budg
 
     # 以評論數排序作為「熱門程度」（若 nearby 未提供則會嘗試用 details API 取得）
     nearby_scored = calculate_popularity_score(nearby, apikey=API_KEY)
-    max_pl = 1 if budget <= 200 else 2 if budget <= 400 else 3 if budget <= 1400 else 4
+    max_pl = 1 if budget <= 200 else 2 if budget <= 600 else 3 if budget <= 1000 else 4
 
     new_details = old_details.copy() if old_details else {}
     options = []
@@ -1040,28 +1009,85 @@ def search_and_build_options(submit_addr, submit_budget, n_clicks, address, budg
 
     return options, new_details, options, 0, "done"
 
+#更新並儲存歷史行程
+@app.callback(
+    [
+        Output("editing-history-id", "data"),
+        Output("url", "pathname", allow_duplicate=True),
+    ],
+    Input({"type": "update-history", "index": ALL}, "n_clicks"),
+    prevent_initial_call=True,
+)
+def start_edit_history(n_clicks_list):
+    if not any(n_clicks_list):
+        raise PreventUpdate
+
+    entry_id = _get_triggered_index()
+    if entry_id is None:
+        raise PreventUpdate
+
+    return entry_id, "/"
+
+
 
 # 儲存當前已選行程並導向歷史頁面
 @app.callback(
     Output('url', 'pathname', allow_duplicate=True),
+    Output('editing-history-id', 'data', allow_duplicate=True),
     Input('save-itinerary-btn', 'n_clicks'),
     State('place-selector', 'value'),
     State('all-place-details', 'data'),
     State('manual-budget-store', 'data'),
+    State('total-trip-budget', 'value'),
+    State('editing-history-id', 'data'),
     prevent_initial_call=True,
 )
-def save_itinerary_and_go(n_clicks, selected, all_details, budgets):
+def save_itinerary_and_go(n_clicks, selected, all_details, budgets, total_trip_budget, editing_id):
     if not n_clicks:
-        return no_update
-    if not current_user.is_authenticated:
-        return '/login'
-    # 儲存為歷史紀錄
-    print(f"[DEBUG] save_itinerary_and_go: user={getattr(current_user, 'id', None)}, selected_len={len(selected or [])}")
+        raise PreventUpdate
+
+    selected = selected or []
+    budgets = budgets or {}
+    all_details = all_details or {}
+
+    # 把總預算寫進 budgets（避免 None）
+    budgets["__total_trip_budget__"] = total_trip_budget
+
+    # ✅ 只存「已選」的 details（避免 DB 膨脹，且確保一致）
+    details_subset = {pid: all_details.get(pid, {}) for pid in selected if pid in all_details}
+
+    # ✅ (1) 先同步寫回「目前行程」：避免回主頁被洗掉
+    save_user_itinerary(current_user.id, selected, budgets, details_subset)
+
+    # ✅ (2) 寫入/更新 history
+    if editing_id:
+        update_history_itinerary(editing_id, current_user.id, selected, budgets, details_subset)
+    else:
+        add_history_itinerary(current_user.id, selected, budgets, details_subset, title=None)
+
+    # ✅ (3) 一律導去 /history
+    # ✅ (4) 清掉 editing 狀態，避免下次誤判成更新模式
+    return '/history', None
+
+        
+def update_history_itinerary(entry_id, user_id, selected, budgets, details):
+    conn = db_connect()
+    c = conn.cursor()
     try:
-        add_history_itinerary(current_user.id, selected or [], budgets or {}, all_details or {}, title=None)
-    except Exception as e:
-        print(f"[ERROR] save_itinerary_and_go: {e}")
-    return '/history'
+        c.execute("""
+            UPDATE itinerary_history
+            SET selected_json = ?, budgets_json = ?, details_json = ?
+            WHERE id = ? AND user_id = ?
+        """, (
+            json.dumps(selected or [], ensure_ascii=False),
+            json.dumps(budgets or {}, ensure_ascii=False),
+            json.dumps(details or {}, ensure_ascii=False),
+            int(entry_id),
+            int(user_id)
+        ))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # 刪除歷史行程（pattern-matching）
@@ -1100,6 +1126,8 @@ def show_history_detail(n_clicks_list):
 
     entry_id = _get_triggered_index() #
     target = get_history_entry(entry_id, current_user.id) #
+    total_trip_budget = (target.get("budgets", {}) or {}).get("__total_trip_budget__")
+
     
     if not target:
         print(f">>> [DEBUG] 找不到 ID={entry_id} 的行程") #
@@ -1120,6 +1148,8 @@ def show_history_detail(n_clicks_list):
         ], style={"padding": "10px", "borderBottom": "1px solid #eee"}))
 
     content = html.Div([
+        # ✅【新增】總預算顯示（最上方）
+        html.Div(f"總預算：{total_trip_budget if total_trip_budget is not None else '-'}",style={"fontSize": "16px","fontWeight": "600","marginBottom": "12px","color": "#3F5D3A"}),
         html.H3(target.get('title', '行程詳情')),
         html.Div(items, style={"maxHeight": "300px", "overflowY": "auto"}),
         html.Hr(),
@@ -1279,28 +1309,30 @@ def submit_rename(bg, cancel, save, new_title, target):
     Input({'type': 'load-history', 'index': ALL}, 'n_clicks'),
     prevent_initial_call=True,
 )
+
 def load_history_to_main(n_clicks_list):
-    # 檢查是否有按鈕被點擊
     if not any(n_clicks_list):
-        return no_update
-        
-    # 替換掉原本報錯的 _parse_triggered_id 邏輯
+        raise PreventUpdate
+
     entry_id = _get_triggered_index()
     if entry_id is None or not current_user.is_authenticated:
         return no_update
 
-    # 直接讀取資料庫，並覆寫目前的 itineraries
     target = get_history_entry(entry_id, current_user.id)
     if not target:
         return no_update
 
-    try:
-        save_user_itinerary(current_user.id, target.get('selected', []), target.get('budgets', {}), target.get('details', {}))
-    except Exception as e:
-        print(f"[LoadHistory] save error: {e}")
-        return no_update
+    # 1) 把這筆歷史寫成「目前行程」
+    save_user_itinerary(
+        current_user.id,
+        target.get('selected', []),
+        target.get('budgets', {}),
+        target.get('details', {})
+    )
 
+    # 2) 導回主頁（主頁會重新從 DB 讀目前行程）
     return '/'
+
 
 
 # 新增新的行程（清空目前儲存並回主頁）
@@ -1350,10 +1382,7 @@ def render_page(all_options, page, selected_values, all_details):
         
         photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=180&photo_reference={p.get('photo_reference')}&key={API_KEY}" if p.get("photo_reference") else None
 
-<<<<<<< Updated upstream
 # --- 完整替換開始 ---
-=======
->>>>>>> Stashed changes
         cards.append(html.Div([
             dcc.Checklist(
                 options=[{"label": "", "value": pid}],
@@ -1381,7 +1410,6 @@ def render_page(all_options, page, selected_values, all_details):
                 # 第三、四行：地址與評分資訊
                 html.Div(f"地址：{p.get('vicinity', '無')}", style={"color": "#555", "fontSize": 14}),
                 html.Div(f"評分：{p.get('rating', '無')} ｜ 距離：{p.get('distance_km', 0):.2f} km", style={"color": "#777", "fontSize": 13}),
-<<<<<<< Updated upstream
                 
                 # 查看詳情按鈕：整合後的正確版本
                 html.Button(
@@ -1404,11 +1432,6 @@ def render_page(all_options, page, selected_values, all_details):
             "paddingBottom": "10px"
         }))
         # --- 替換結束 ---
-=======
-                html.Button("查看詳情", id={"type": "detail-btn", "index": pid}, style={"marginTop": "4px", "fontSize": 13, "padding": "2px 8px"})
-            ], style={"width": "calc(100% - 130px)"})
-        ], style={"display": "flex", "alignItems": "center", "marginBottom": "10px", "borderBottom": "1px solid #eee", "paddingBottom": "10px"}))
->>>>>>> Stashed changes
 
     max_page = max((len(all_options) - 1) // PAGE_SIZE + 1, 1)
     return cards, f"第 {page + 1} / {max_page} 頁"
@@ -1701,7 +1724,6 @@ def render_modal_content(state, cache):
         html.P([html.Strong("地址: "), res.get("formatted_address")]),
         html.P([html.Strong("電話: "), res.get("formatted_phone_number", "無")]),
         html.P([html.Strong("狀態: "), html.Span(status_text, style={"color": "green" if open_now else "red"})]),
-<<<<<<< Updated upstream
         
         # --- 在這裡新增網址 ---
         html.P([
@@ -1710,8 +1732,6 @@ def render_modal_content(state, cache):
         ]),
         # --------------------
 
-=======
->>>>>>> Stashed changes
         html.Hr(),
         html.H4("最新評論"),
         html.Div([
