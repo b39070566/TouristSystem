@@ -44,7 +44,11 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 # 修改 DB_NAME 的定義（約第 35 行）
 # 請將這裡改成你電腦上的絕對路徑，且確保資料夾已手動建立
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 DB_NAME = r"D:\data\Documents\GitHub\midterm_new\Midterm\users.db"
+=======
+DB_NAME = r"d:\Users\master_file\PythonCode_Basic\Midterm-main\users.db"
+>>>>>>> Stashed changes
 =======
 DB_NAME = r"d:\Users\master_file\PythonCode_Basic\Midterm-main\users.db"
 >>>>>>> Stashed changes
@@ -362,7 +366,11 @@ if not API_KEY:
 # Fallback（僅在你沒有提供環境變數或 .env 時使用；建議移除或替換為空字串）
 if not API_KEY:
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     API_KEY = ""
+=======
+    API_KEY = "YOUR_GOOGLE_MAPS_API_KEY_HERE"
+>>>>>>> Stashed changes
 =======
     API_KEY = "YOUR_GOOGLE_MAPS_API_KEY_HERE"
 >>>>>>> Stashed changes
