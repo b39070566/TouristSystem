@@ -383,7 +383,7 @@ if not API_KEY:
 # Fallback（僅在你沒有提供環境變數或 .env 時使用；建議移除或替換為空字串）
 
 if not API_KEY:
-    API_KEY = "AIzaSyAdq8R2gfquydGPqnW64QygfxCZRXGHmEc"
+    API_KEY = "your_api_key_here"
 
 
 
