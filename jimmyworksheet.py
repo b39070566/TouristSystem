@@ -735,10 +735,10 @@ def get_app_layout(username):
                             html.H3("💡 預算分配使用說明", style={"color": "#56602D", "marginTop": "0"}),
                             html.P("系統依據店家等級自動分配預算上限：", style={"fontWeight": "bold", "marginBottom": "10px"}),
                             html.Ul([
-                                html.Li("一個錢 ($)：預算 < 200 元"),
-                                html.Li("兩個錢 ($$)：預算 200 ~ 600 元"),
-                                html.Li("三個錢 ($$$)：預算 600 ~ 1000 元"),
-                                html.Li("四個錢 ($$$$)：預算 1000 ~ 2000元 或者 超過2000元 "),
+                                html.Li("一個錢 ($)：預算 <= 200 元"),
+                                html.Li("兩個錢 ($$)：預算 201 ~ 600 元"),
+                                html.Li("三個錢 ($$$)：預算 601 ~ 1000 元"),
+                                html.Li("四個錢 ($$$$)：預算 1001 ~ 2000元 或者 超過2000元 "),
                                 html.Li("※ 若商家未提供金額，系統自動帶入 200 元計算", style={"color": "#d9534f", "marginTop": "10px", "fontWeight": "bold"})
                             ], style={"lineHeight": "1.8", "fontSize": "15px"}),
                             html.Hr(style={"margin": "20px 0"}),
@@ -991,7 +991,7 @@ def search_and_build_options(submit_addr, submit_budget, n_clicks, address, budg
 
     # 以評論數排序作為「熱門程度」（若 nearby 未提供則會嘗試用 details API 取得）
     nearby_scored = calculate_popularity_score(nearby, apikey=API_KEY)
-    max_pl = 1 if budget <= 200 else 2 if budget <= 400 else 3 if budget <= 1400 else 4
+    max_pl = 1 if budget <= 200 else 2 if budget <= 600 else 3 if budget <= 1000 else 4
 
     new_details = old_details.copy() if old_details else {}
     options = []
@@ -1465,13 +1465,7 @@ def update_budget_logic(input_vals, selected, total_trip_limit, single_budget_li
     if remaining_budget < 0:
         color = "#d9534f" # 警告紅
         status_text = f"⚠️ 已超出總預算 {abs(remaining_budget):.0f} 元"
-        if violation_count > 0:
-            status_text += f" (且有 {violation_count} 處超出單點限制)"
 
-    # 2. 次要判斷：雖然總額沒超，但有單點預算超支 (顯示橘色)
-    elif violation_count > 0:
-        color = "#f20418" # 警告橘
-        status_text = f"🚨 提醒：有 {violation_count} 個地點超過單點預算限制"
 
     # 3. 判斷：預算剛好花完 (顯示藍色/橘色)
     elif remaining_budget == 0 and total_trip_limit > 0:
