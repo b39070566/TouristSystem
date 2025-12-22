@@ -43,15 +43,8 @@ login_manager.login_view = '/login'
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 # 修改 DB_NAME 的定義（約第 35 行）
 # 請將這裡改成你電腦上的絕對路徑，且確保資料夾已手動建立
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
+
 DB_NAME = r"D:\data\Documents\GitHub\midterm_new\Midterm\users.db"
-=======
-DB_NAME = r"d:\Users\master_file\PythonCode_Basic\Midterm-main\users.db"
->>>>>>> Stashed changes
-=======
-DB_NAME = r"d:\Users\master_file\PythonCode_Basic\Midterm-main\users.db"
->>>>>>> Stashed changes
 
 # 建議在這裡加一行 print，啟動時你就能在終端機看到正確路徑
 print(f"✅ 資料庫絕對路徑設定為: {DB_NAME}")
@@ -364,16 +357,7 @@ if not API_KEY:
         pass
 
 # Fallback（僅在你沒有提供環境變數或 .env 時使用；建議移除或替換為空字串）
-if not API_KEY:
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-    API_KEY = ""
-=======
-    API_KEY = "YOUR_GOOGLE_MAPS_API_KEY_HERE"
->>>>>>> Stashed changes
-=======
-    API_KEY = "YOUR_GOOGLE_MAPS_API_KEY_HERE"
->>>>>>> Stashed changes
+API_KEY = ""
 
 PAGE_SIZE = 10
 
@@ -764,13 +748,13 @@ def display_page(pathname):
                         html.Div(h.get('title', ''), style={"fontWeight": "bold", "marginBottom": "6px"}),
                         html.Div(h.get('created_at', ''), style={"color": "#777", "fontSize": 12, "marginBottom": "6px"}),
                         html.Div(', '.join(names), style={"color": "#555", "fontSize": 13, "marginBottom": "8px", "overflow": "hidden", "textOverflow": "ellipsis"}),
-                        html.Div([
-                            html.Button("查看", id={"type": "view-history", "index": h.get('id')}, n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px"}),
-                            html.Button("載入", id={"type": "load-history", "index": h.get('id')}, n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px", "backgroundColor": "#1890ff", "color": "#fff", "border": "none"}),
-                            html.Button("刪除", id={"type": "delete-history", "index": h.get('id')}, n_clicks=0, style={"backgroundColor": "#ff4d4f", "color": "#fff", "border": "none", "padding": "6px 8px"}),
-                            html.Button("改名", id={"type": "rename-history", "index": h.get('id')},n_clicks=0, style={"padding": "6px 8px", "marginRight": "6px"})
-                        ])
-                    ]
+                        html.Div([html.Button("查看",id={"type": "view-history", "index": h.get('id')},n_clicks=0,style={"padding": "6px 10px","borderRadius": "8px","border": "1px solid #3F5D3A","backgroundColor": "transparent","color": "#3F5D3A","cursor": "pointer"}),
+                                  html.Button("載入",id={"type": "load-history", "index": h.get('id')},n_clicks=0,style={"padding": "6px 10px","borderRadius": "8px","backgroundColor": "#3F5D3A","color": "#FFFFFF","border": "none","cursor": "pointer"}),
+                                  html.Button("刪除",id={"type": "delete-history", "index": h.get('id')},n_clicks=0,style={"padding": "6px 10px","borderRadius": "8px","backgroundColor": "#8B2C2C","color": "#FFFFFF","border": "none","cursor": "pointer"}),
+                                  html.Button("改名",id={"type": "rename-history", "index": h.get('id')},n_clicks=0,style={"padding": "6px 10px","borderRadius": "8px","border": "1px solid #6B7C6C","backgroundColor": "transparent","color": "#2F3A2F","cursor": "pointer"})],
+                                style={"display": "flex","gap": "10px",          # ✅ 等距關鍵在這"flexWrap": "wrap","marginTop": "8px"
+                               })
+                               ]
 
                     cards.append(html.Div(card_children, style={"width": "23%", "border": "1px solid #eee", "borderRadius": "6px", "padding": "10px", "boxSizing": "border-box", "marginBottom": "12px"}))
 
@@ -1253,7 +1237,7 @@ def render_page(all_options, page, selected_values, all_details):
                 options=[{"label": "", "value": pid}],
                 value=[pid] if pid in selected_values else [],
                 id={"type": "place-check", "index": pid},
-                style={"marginRight": "8px"}
+                style={"marginRight": "8px","backgroundColor": "#fff","boxShadow": "0 6px 16px rgba(0,0,0,0.12)","border": "1px solid rgba(0,0,0,0.06)"}
             ),
             html.Img(src=photo_url, style={"width": "100px", "height": "100px", "objectFit": "cover", "borderRadius": "4px", "marginRight": "10px"}) if photo_url else None,
             html.Div([
