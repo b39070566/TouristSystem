@@ -35,19 +35,36 @@ login_manager.init_app(server)
 login_manager.login_view = '/login'
 
 # --- SQLite 資料庫設定 ---
-# 修改前
-# DB_NAME = os.path.join(os.path.dirname(__file__), "users.db")
-
-# 修改後 (強制獲取絕對路徑並處理 Windows 的斜線問題)
-# --- 尋找這段並替換 ---
+# 備援機制：優先使用第一個路徑，若不存在則使用第二個路徑
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-# 修改 DB_NAME 的定義（約第 35 行）
-# 請將這裡改成你電腦上的絕對路徑，且確保資料夾已手動建立
 
-DB_NAME = r"D:\data\Documents\GitHub\midterm_new\Midterm\users.db"
+# 定義多個可能的資料庫路徑（按優先順序）
+DB_PATHS = [
+    r"D:\data\Documents\GitHub\midterm_new\Midterm\users.db",  # 第一優先
+    r"C:\Users\userz\Documents\GitHub\Midterm\users.db",       # 第二優先
+    os.path.join(BASE_DIR, "users.db")                          # 第三優先（本地目錄）
+]
 
-# 建議在這裡加一行 print，啟動時你就能在終端機看到正確路徑
-print(f"✅ 資料庫絕對路徑設定為: {DB_NAME}")
+# 選擇第一個存在的路徑，若都不存在則使用第一個路徑（會自動建立）
+DB_NAME = None
+for path in DB_PATHS:
+    if os.path.exists(path):
+        DB_NAME = path
+        print(f"✅ 找到現有資料庫: {DB_NAME}")
+        break
+
+# 如果所有路徑都不存在，使用第一個路徑並確保目錄存在
+if DB_NAME is None:
+    DB_NAME = DB_PATHS[0]
+    db_dir = os.path.dirname(DB_NAME)
+    if db_dir and not os.path.exists(db_dir):
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+            print(f"📁 建立資料庫目錄: {db_dir}")
+        except Exception as e:
+            print(f"⚠️ 無法建立目錄 {db_dir}，改用本地目錄")
+            DB_NAME = DB_PATHS[-1]  # 使用本地目錄作為最終備援
+    print(f"✅ 將建立新資料庫: {DB_NAME}")
 
 # 1. 移除 DB_LOCK，保留最基礎的連線與初始化
 def db_connect():
@@ -350,14 +367,13 @@ def load_user(user_id):
 API_KEY = os.environ.get('API_KEY')
 if not API_KEY:
     try:
-        from dotenv import load_dotenv
         load_dotenv()
         API_KEY = os.environ.get('API_KEY')
     except Exception:
         pass
 
 # Fallback（僅在你沒有提供環境變數或 .env 時使用；建議移除或替換為空字串）
-API_KEY = ""
+API_KEY = "AIzaSyBU9HJ0M0EspZNoHf40JprQL8tDPZ_UZbU"
 
 PAGE_SIZE = 10
 
@@ -756,15 +772,15 @@ def display_page(pathname):
                                })
                                ]
 
-                    cards.append(html.Div(card_children, style={"width": "23%", "border": "1px solid #eee", "borderRadius": "6px", "padding": "10px", "boxSizing": "border-box", "marginBottom": "12px"}))
+                    cards.append(html.Div(card_children, style={"width": "23%", "border": "2px solid #FFFFFF", "borderRadius": "10px", "padding": "14px", "boxSizing": "border-box", "marginBottom": "12px", "backgroundColor": "rgba(255, 255, 255, 0.85)", "boxShadow": "0 4px 12px rgba(0,0,0,0.1)"}))
 
                 grid = html.Div(cards, style={"display": "flex", "flexWrap": "wrap", "gap": "1%"})
 
                 return html.Div([
                     html.Div([
                         html.Div([
-                            dcc.Link(html.Button("回到主頁", style={"padding": "6px 10px", "marginRight": "8px"}), href='/'),
-                            html.Button("新增新的行程", id='new-itinerary-btn', n_clicks=0, style={"padding": "6px 10px"}),
+                            dcc.Link(html.Button("回到主頁", style={"padding": "8px 16px", "borderRadius": "8px", "backgroundColor": "#3F5D3A", "color": "#FFFFFF", "border": "none", "cursor": "pointer", "marginRight": "10px", "fontSize": "14px", "fontWeight": "500"}), href='/'),
+                            html.Button("新增新的行程", id='new-itinerary-btn', n_clicks=0, style={"padding": "8px 16px", "borderRadius": "8px", "backgroundColor": "#3F5D3A", "color": "#FFFFFF", "border": "none", "cursor": "pointer", "fontSize": "14px", "fontWeight": "500"}),
                         ], style={"textAlign": "right"})
                     ], style={"marginBottom": "10px"}),
                      html.Div(
@@ -1247,7 +1263,7 @@ def render_page(all_options, page, selected_values, all_details):
                 ]),
                 html.Div(f"地址：{p.get('vicinity', '無')}", style={"color": "#555", "fontSize": 14}),
                 html.Div(f"評分：{p.get('rating', '無')} ｜ 距離：{p.get('distance_km', 0):.2f} km", style={"color": "#777", "fontSize": 13}),
-                html.Button("查看詳情", id={"type": "detail-btn", "index": pid}, style={"marginTop": "4px", "fontSize": 13, "padding": "2px 8px"})
+                html.Button("查看詳情", id={"type": "detail-btn", "index": pid}, style={**STYLES["btn_primary"], "marginTop": "8px"})
             ], style={"width": "calc(100% - 130px)"})
         ], style={"display": "flex", "alignItems": "center", "marginBottom": "10px", "borderBottom": "1px solid #eee", "paddingBottom": "10px"}))
 
