@@ -43,7 +43,7 @@ login_manager.login_view = '/login'
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 # 修改 DB_NAME 的定義（約第 35 行）
 # 請將這裡改成你電腦上的絕對路徑，且確保資料夾已手動建立
-DB_NAME = r"C:\Users\userz\Documents\GitHub\Midterm\users.db"
+DB_NAME = r"D:\data\Documents\GitHub\midterm_new\Midterm\users.db"
 
 # 建議在這裡加一行 print，啟動時你就能在終端機看到正確路徑
 print(f"✅ 資料庫絕對路徑設定為: {DB_NAME}")
@@ -386,7 +386,7 @@ if not API_KEY:
 
 # Fallback（僅在你沒有提供環境變數或 .env 時使用；建議移除或替換為空字串）
 if not API_KEY:
-    API_KEY = "AIzaSyBU9HJ0M0EspZNoHf40JprQL8tDPZ_UZbU"
+    API_KEY = ""
 
 PAGE_SIZE = 10
 
@@ -640,7 +640,7 @@ def get_app_layout(username):
                         ], style={"display": "flex", "alignItems": "center", "gap": "2px"}),
                         html.Div([
                             dcc.Input(
-                                id="total-trip-budget", type="number", placeholder="預算上限 (TWD)", value=1000, style=STYLES["input_budget"]
+                                id="total-trip-budget", type="number", placeholder="預算上限 (TWD)", value=None, style=STYLES["input_budget"]
                             ),
                             html.Span("*", style={"color": "red", "fontWeight": "bold", "marginLeft": "4px", "fontSize": "16px"}),
                         ], style={"display": "flex", "alignItems": "center", "gap": "2px"}),
