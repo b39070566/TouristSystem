@@ -25,23 +25,25 @@ from dash.exceptions import PreventUpdate
 # 初始化 Flask Server 與 Dash
 server = Flask(__name__)
 server.secret_key = os.environ.get("SECRET_KEY", "midterm-demo-123456")
-# 使用專案中的 `assets` 資料夾來載入全域 CSS（例如 assets/style.css）
+server.config["SECRET_KEY"] = server.secret_key  # 雙保險（可留）
+
+# 使用同一個 Flask server 給 Dash（關鍵）
 app = dash.Dash(
     __name__,
+    server=server,                 # ✅ 一定要加這行
     assets_folder='assets',
     suppress_callback_exceptions=True
 )
 
-# 👇 這一行一定要在 Dash 建立之後
-server = app.server
+# ❌ 刪掉這行（不要覆蓋 server）
+# server = app.server
 
-
-# 初始化 LoginManager
+# 初始化 LoginManager（會綁到同一個 server）
 login_manager = LoginManager()
 login_manager.init_app(server)
 login_manager.login_view = '/login'
 
-# --- SQLite 資料庫設定 ---
+print("SECRET_KEY len =", len(server.secret_key or ""))
 # 備援機制：優先使用第一個路徑，若不存在則使用第二個路徑
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -49,7 +51,7 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 # 請將這裡改成你電腦上的絕對路徑，且確保資料夾已手動建立
 
 
-DB_NAME = r"D:\data\Documents\GitHub\midterm_new\Midterm\users.db"
+
 
 
 # ----------------------------------------------------
