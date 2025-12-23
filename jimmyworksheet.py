@@ -24,7 +24,7 @@ from dash.exceptions import PreventUpdate
 
 # 初始化 Flask Server 與 Dash
 server = Flask(__name__)
-server.secret_key = 'CHANGE_THIS_SECRET_KEY_IN_PRODUCTION'  # 用於 Session 加密
+server.secret_key = 'midterm-demo-123456'  # 用於 Session 加密
 
 # 使用專案中的 `assets` 資料夾來載入全域 CSS（例如 assets/style.css）
 app = dash.Dash(
