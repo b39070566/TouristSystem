@@ -46,33 +46,15 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_NAME = r"D:\data\Documents\GitHub\midterm_new\Midterm\users.db"
 
 
-# 定義多個可能的資料庫路徑（按優先順序）
-DB_PATHS = [
-    r"D:\data\Documents\GitHub\midterm_new\Midterm\users.db",  # 第一優先
-    r"C:\Users\userz\Documents\GitHub\Midterm\users.db",       # 第二優先
-    os.path.join(BASE_DIR, "users.db")                          # 第三優先（本地目錄）
-]
+# ----------------------------------------------------
+# 📁 SQLite 資料庫路徑（Demo / Cloud Run 專用）
+# ----------------------------------------------------
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-# 選擇第一個存在的路徑，若都不存在則使用第一個路徑（會自動建立）
-DB_NAME = None
-for path in DB_PATHS:
-    if os.path.exists(path):
-        DB_NAME = path
-        print(f"✅ 找到現有資料庫: {DB_NAME}")
-        break
+DB_NAME = os.path.join(BASE_DIR, "users.db")
 
-# 如果所有路徑都不存在，使用第一個路徑並確保目錄存在
-if DB_NAME is None:
-    DB_NAME = DB_PATHS[0]
-    db_dir = os.path.dirname(DB_NAME)
-    if db_dir and not os.path.exists(db_dir):
-        try:
-            os.makedirs(db_dir, exist_ok=True)
-            print(f"📁 建立資料庫目錄: {db_dir}")
-        except Exception as e:
-            print(f"⚠️ 無法建立目錄 {db_dir}，改用本地目錄")
-            DB_NAME = DB_PATHS[-1]  # 使用本地目錄作為最終備援
-    print(f"✅ 將建立新資料庫: {DB_NAME}")
+print(f"📌 SQLite DB path = {DB_NAME}")
+
 
 # 1. 移除 DB_LOCK，保留最基礎的連線與初始化
 def db_connect():
