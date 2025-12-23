@@ -4,3 +4,9 @@ pandas
 plotly
 dash_leaflet
 geopy
+
+flask
+flask-login
+gunicorn
+python-dotenv
+requests
