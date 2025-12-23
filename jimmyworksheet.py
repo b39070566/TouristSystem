@@ -27,8 +27,15 @@ server = Flask(__name__)
 server.secret_key = 'CHANGE_THIS_SECRET_KEY_IN_PRODUCTION'  # 用於 Session 加密
 
 # 使用專案中的 `assets` 資料夾來載入全域 CSS（例如 assets/style.css）
-app = dash.Dash(__name__, server=server, assets_folder='assets')
-app.config.suppress_callback_exceptions = True  # 必須開啟，因為我們是動態切換 Layout
+app = dash.Dash(
+    __name__,
+    assets_folder='assets',
+    suppress_callback_exceptions=True
+)
+
+# 👇 這一行一定要在 Dash 建立之後
+server = app.server
+
 
 # 初始化 LoginManager
 login_manager = LoginManager()
@@ -1755,13 +1762,14 @@ def toggle_help_modal(n_open, n_close, n_bg):
 # --- 移到程式碼最底部 ---
 # --- 檢查點 1：刪除程式碼上半部所有「呼叫」init_db() 的地方 ---
 # 確保原本在 init_db() 定義下方的呼叫被刪除了！
+    # 檢查檔案是否已存在，避免重複初始化
+if not os.path.exists(DB_NAME):
+    init_db()
+    print("首次啟動，資料庫已建立。")
+
 
 # --- 檢查點 2：修改底部的啟動邏輯 ---
 if __name__ == "__main__":
-    # 檢查檔案是否已存在，避免重複初始化
-    if not os.path.exists(DB_NAME):
-        init_db()
-        print("首次啟動，資料庫已建立。")
-    
+
     # 強制單執行緒模式，關閉重載器，徹底排除併發問題
     app.run(debug=False, threaded=False, use_reloader=False)
