@@ -1,0 +1,68 @@
+
+
+📋 附近行程智慧推薦系統 (Nearby Trip Recommender)
+
+本專案是一個基於 **Dash (Flask)** 框架開發的全端 Web 應用，旨在協助使用者根據特定出發地與預算限制，即時規劃並管理個人旅遊行程。
+
+🌟 核心亮點
+即時數據整合：串接 **Google Places API (Nearby Search & Details)** 實現地理位置感知與店家資訊檢索。
+智慧預算分配：根據 Google 的 `price_level` 自動估算初始開支，並提供動態預算條與圖表分析。
+高可靠性持久化：自研 SQLite 資料管線，解決多執行緒環境下的資料庫鎖死（Database Lock）問題。
+互動式 UI/UX：採用 Pattern-matching Callbacks 實作動態清單管理（排序、移除、詳情彈窗）。
+
+---
+
+🏗️ 系統架構圖
+
+
+---
+
+🛠️ 技術棧 (Tech Stack)
+Frontend: Plotly Dash (HTML Components, Core Components), Dash Bootstrap Components (Custom CSS)
+Backend: Flask (Server Engine), Flask-Login (Session Management)
+Database: SQLite3 (Raw SQL, Optimized with PRAGMA settings)
+APIs: Google Maps Platform (Geocoding, Nearby Search, Place Details, Place Photo)
+DevOps: Dotenv (Environment Management), Python-Werkzeug (Security Hashing)
+
+---
+
+🚀 關鍵技術實作說明
+
+1. 資料庫效能與穩定性優化
+針對 SQLite 在 Web 環境中常見的併發衝突，本專案實作了以下優化：
+效能調校：使用 `PRAGMA journal_mode=DELETE` 與 `synchronous=FULL` 確保實體寫入穩定性。
+資源回收：實作連線封裝函式，確保每次 Query 後確實釋放 `Connection` 與 `File Lock`。
+資料結構：設計 3 張核心表（Users, Itineraries, History），並利用 Unique Index 確保歷史紀錄命名的唯一性與查詢效率。
+
+2. 動態預算計算引擎
+自動估算邏輯：系統會自動解析 API 回傳的價格等級（1-4 $），映射至對應的金額級距（如 $$ $\rightarrow$ 600 TWD）。
+即時反饋迴圈：透過 Dash Callbacks 監聽所有輸入框，動態更新進度條顏色（綠色：安全 / 紅色：超支）與圓餅圖分配比例。
+
+3. 使用者狀態管理 (Auth Flow)
+* 整合 Flask-Login 與 Werkzeug。
+* 密碼經過 `PBKDF2` 加密儲存，不留存明文。
+* 支援「自動恢復」功能：使用者登入後，系統會自動從 `itineraries` 表載入上次未完成的規劃進度。
+
+---
+
+
+🔧 安裝與啟動
+1. 克隆專案：
+   ```bash
+   git clone https://github.com/yourusername/your-repo.git
+   ```
+2. 安裝依賴：
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. 環境變數設定：
+   建立 `.env` 檔案並填入 API 金鑰：
+   ```env
+   API_KEY=你的GoogleAPI金鑰
+   SECRET_KEY=自定義Flask密鑰
+   ```
+4. 啟動應用：
+   ```bash
+   python app.py
+   ```
+
